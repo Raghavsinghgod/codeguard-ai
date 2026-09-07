@@ -1,453 +1,454 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScanReportView } from "@/components/ScanReportView";
-import { useAuth } from "@/hooks/use-auth";
-import {
-  runScan,
-  ATTACK_PHASES,
-  EMPTY_COUNTS,
-  type ScanFile,
-  type ScanReport,
-} from "@/lib/scanner";
-import { ROADMAP_PHASES, TOTAL_PARTS, SHIPPED_PARTS } from "@/lib/roadmap";
+import { toast } from "sonner";
 import {
   Crosshair,
+  FileCode2,
+  FlaskConical,
+  History,
+  ListChecks,
   LogOut,
   Play,
-  Trash2,
-  History,
-  Loader2,
-  FileCode2,
   Radar,
-  Map,
-  FileWarning,
+  Trash2,
+  Upload,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import logo from "@/assets/logo.svg";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { ScanReport } from "@/components/ScanReport";
+import { RoadmapView } from "@/components/RoadmapView";
+import { useAuth } from "@/hooks/use-auth";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { scan, type ScanInput, type ScanResult } from "@/lib/scanner";
 
-const SAMPLE_CODE = `// checkout-service/billing.ts
-import express from "express";
-import db from "./db";
+const STAGES = [
+  { id: "recon", label: "Recon & fingerprint", detail: "Detecting languages, entry points, and data flows…" },
+  { id: "probes", label: "Injection probes", detail: "Simulating SQL, command, and code injection payloads…" },
+  { id: "auth", label: "Auth & session attacks", detail: "Testing token forgery, IDOR, and access-control gaps…" },
+  { id: "crypto", label: "Crypto & secrets sweep", detail: "Sweeping for weak hashing, hardcoded keys, and TLS bypasses…" },
+  { id: "report", label: "Report generation", detail: "Scoring findings and assembling the pentest report…" },
+];
 
-const app = express();
+const SAMPLE_NAME = "vulnerable-demo.js";
+const SAMPLE_CODE = `// Demo API service — intentionally vulnerable (for testing CrackScope)
+const express = require("express");
+const { exec } = require("child_process");
+const jwt = require("jsonwebtoken");
+const db = require("./db");
 
-app.get("/invoice", (req, res) => {
-  const userQuery = "SELECT * FROM invoices WHERE owner = '" + req.query.user + "'";
-  db.query(userQuery, (err, rows) => {
-    res.send("<h1>Invoices for " + req.query.user + "</h1>" + rows.map(r => r.html).join(""));
-  });
+const API_KEY = "sk_live_9f8a7b6c5d4e3f2a1b";
+const awsKey = "AKIAIOSFODNN7EXAMPLE";
+
+app.use(cors({ origin: "*" }));
+
+app.get("/login", (req, res) => {
+  db.query("SELECT * FROM users WHERE name='" + req.body.user + "'");
+  const sessionToken = Math.random().toString(36).substring(2);
+  res.cookie("session", sessionToken);
 });
 
-app.get("/download", (req, res) => {
-  const path = "./uploads/" + req.query.file;
-  res.sendFile(path);
+app.get("/report", (req, res) => {
+  exec("cat reports/" + req.params.file, (err, out) => res.send(out));
+  res.redirect(req.query.next);
+  fs.readFile("uploads/" + req.params.path, (e, d) => {});
+  const data = axios.get(req.query.targetUrl);
 });
 
-const apiKey = "sk_live_51H9xKdQz8fTj2mNp3vLwXyZa";
-const resetToken = Math.random().toString(36).slice(2);
-const md5 = require("crypto").createHash("md5").update(req.body.password).digest("hex");
+app.get("/verify", (req, res) => {
+  jwt.verify(req.headers.token, "secret", { ignoreExpiration: true });
+});
 
-eval("console.log('processing ' + req.body.action)");
+document.getElementById("out").innerHTML = req.query.q;
 `;
 
-type Phase = "idle" | "running" | "done";
+const toScanResult = (row: {
+  name: string;
+  score: number;
+  grade: string;
+  filesScanned: number;
+  linesScanned: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  findings: ScanResult["findings"];
+}): { name: string; result: ScanResult } => ({
+  name: row.name,
+  result: {
+    score: row.score,
+    grade: row.grade as ScanResult["grade"],
+    filesScanned: row.filesScanned,
+    linesScanned: row.linesScanned,
+    languages: [],
+    counts: {
+      critical: row.critical,
+      high: row.high,
+      medium: row.medium,
+      low: row.low,
+      info: row.info,
+    },
+    findings: row.findings,
+    durationMs: 0,
+  },
+});
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const [tab, setTab] = useState("scanner");
+  const [scanName, setScanName] = useState("");
+  const [fileName, setFileName] = useState("pasted.js");
+  const [codeText, setCodeText] = useState("");
+  const [uploaded, setUploaded] = useState<ScanInput[]>([]);
+  const [running, setRunning] = useState(false);
+  const [stageIdx, setStageIdx] = useState(-1);
+  const [result, setResult] = useState<ScanResult | null>(null);
+  const [savedName, setSavedName] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<{ name: string; result: ScanResult } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const scans = useQuery(api.scans.listScans, {});
   const saveScan = useMutation(api.scans.saveScan);
   const deleteScan = useMutation(api.scans.deleteScan);
-  const scans = useQuery(api.scans.listScans, {});
 
-  const [tab, setTab] = useState("scan");
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [phaseIdx, setPhaseIdx] = useState(0);
-  const [name, setName] = useState("Untitled target");
-  const [code, setCode] = useState("");
-  const [files, setFiles] = useState<ScanFile[]>([]);
-  const [report, setReport] = useState<ScanReport | null>(null);
-  const [viewingId, setViewingId] = useState<Id<"scans"> | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
+    navigate("/");
   };
 
-  const addFiles = useCallback((list: FileList | null) => {
-    if (!list) return;
-    const incoming = Array.from(list).slice(0, 10);
-    Promise.all(
-      incoming.map(
-        (f) =>
-          new Promise<ScanFile>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve({ name: f.name, content: String(reader.result ?? "") });
-            reader.onerror = reject;
-            reader.readAsText(f);
-          }),
-      ),
-    )
-      .then((added) => {
-        setFiles((prev) => [...prev, ...added].slice(0, 20));
-        toast.success(`Added ${added.length} file${added.length === 1 ? "" : "s"}`);
-      })
-      .catch(() => toast.error("Failed to read a file"));
-  }, []);
+  const handleFiles = async (fileList: FileList | null) => {
+    if (!fileList?.length) return;
+    const inputs: ScanInput[] = [];
+    for (const file of Array.from(fileList).slice(0, 10)) {
+      inputs.push({ name: file.name, content: await file.text() });
+    }
+    setUploaded((prev) => [...prev, ...inputs].slice(0, 10));
+    toast.success(`${inputs.length} file${inputs.length === 1 ? "" : "s"} queued for attack simulation`);
+  };
 
-  const runSimulation = async () => {
-    const allFiles: ScanFile[] = [
-      ...files,
-      ...(code.trim()
-        ? [{ name: files.length === 0 && code.includes("\n") === false ? "pasted-snippet" : "pasted-code", content: code }]
-        : []),
-    ];
-    if (allFiles.length === 0) {
-      toast.error("Paste some code or add files first");
+  const handleRun = () => {
+    const inputs: ScanInput[] = [];
+    if (codeText.trim()) inputs.push({ name: fileName || "pasted.js", content: codeText });
+    inputs.push(...uploaded);
+    if (inputs.length === 0) {
+      toast.error("Add code first — paste a file or upload one to attack.");
       return;
     }
-    setReport(null);
-    setViewingId(null);
-    setPhase("running");
-    setPhaseIdx(0);
-    // Staged attack-simulation animation
-    for (let i = 0; i < ATTACK_PHASES.length; i++) {
-      setPhaseIdx(i);
-      await new Promise((r) => setTimeout(r, 420));
-    }
-    const result = runScan(allFiles, name.trim() || "Untitled target");
-    setReport(result);
-    setPhase("done");
-    try {
-      await saveScan({
-        name: result.name,
-        score: result.score,
-        grade: result.grade,
-        filesScanned: result.filesScanned,
-        linesScanned: result.linesScanned,
-        critical: result.counts.critical,
-        high: result.counts.high,
-        medium: result.counts.medium,
-        low: result.counts.low,
-        info: result.counts.info,
-        findings: result.findings,
-      });
-      toast.success("Scan saved to history");
-    } catch {
-      toast.error("Scan completed but could not be saved");
-    }
+    if (timerRef.current) clearInterval(timerRef.current);
+    setResult(null);
+    setViewing(null);
+    setSavedName(null);
+    setStageIdx(0);
+    setRunning(true);
+    let i = 0;
+    timerRef.current = setInterval(() => {
+      i += 1;
+      if (i < STAGES.length) {
+        setStageIdx(i);
+      } else {
+        if (timerRef.current) clearInterval(timerRef.current);
+        setStageIdx(STAGES.length - 1);
+        setRunning(false);
+        const res = scan(inputs);
+        setResult(res);
+      }
+    }, 620);
   };
+
+  // Auto-save every finished scan to the workspace history.
+  useEffect(() => {
+    if (!result || savedName) return;
+    saveScan({
+      name: scanName.trim() || `Scan ${new Date().toLocaleString()}`,
+      score: result.score,
+      grade: result.grade,
+      filesScanned: result.filesScanned,
+      linesScanned: result.linesScanned,
+      critical: result.counts.critical,
+      high: result.counts.high,
+      medium: result.counts.medium,
+      low: result.counts.low,
+      info: result.counts.info,
+      findings: result.findings,
+    })
+      .then(() => {
+        setSavedName(scanName.trim() || `Scan ${new Date().toLocaleString()}`);
+        toast.success("Report saved to workspace history");
+      })
+      .catch(() => toast.error("Could not save the report"));
+  }, [result, savedName, scanName, saveScan]);
 
   const handleDelete = async (id: Id<"scans">) => {
     await deleteScan({ id });
-    if (viewingId === id) {
-      setViewingId(null);
-      setTab("history");
-    }
+    toast.success("Scan deleted");
   };
 
-  const viewedScan = useMemo(
-    () => (viewingId ? scans?.find((s) => s._id === viewingId) ?? null : null),
-    [viewingId, scans],
-  );
-
-  const viewedReport: ScanReport | null = useMemo(() => {
-    if (!viewedScan) return null;
-    return {
-      name: viewedScan.name,
-      createdAt: viewedScan.createdAt,
-      score: viewedScan.score,
-      grade: viewedScan.grade,
-      filesScanned: viewedScan.filesScanned,
-      linesScanned: viewedScan.linesScanned,
-      counts: {
-        critical: viewedScan.critical,
-        high: viewedScan.high,
-        medium: viewedScan.medium,
-        low: viewedScan.low,
-        info: viewedScan.info,
-      },
-      findings: viewedScan.findings,
-      phases: ATTACK_PHASES,
-    };
-  }, [viewedScan]);
+  const activeReport = viewing ?? (result ? { name: scanName || "Untitled scan", result } : null);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-2.5">
-            <img src={logo} alt="CrackScope" className="size-8 rounded-lg" />
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/30">
+              <Crosshair className="size-4.5 text-primary" />
+            </div>
             <span className="text-[15px] font-semibold tracking-tight">CrackScope</span>
-            <Badge variant="secondary" className="ml-1 hidden sm:inline-flex">
-              Part 1 / {TOTAL_PARTS}
+            <Badge variant="outline" className="ml-1 rounded-full border-primary/30 text-[11px] text-primary">
+              beta
             </Badge>
-          </div>
+          </Link>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-muted-foreground sm:block">
-              {user?.name ?? user?.email ?? "Operator"}
+              {user?.email ?? user?.name ?? "Guest"}
             </span>
-            <Button variant="outline" size="sm" className="cursor-pointer gap-1.5" onClick={handleSignOut}>
+            <Button variant="outline" size="sm" className="gap-2 rounded-full" onClick={handleSignOut}>
               <LogOut className="size-3.5" /> Sign out
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-6 py-8">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-3">
-            <TabsTrigger value="scan" className="cursor-pointer gap-1.5">
-              <Crosshair className="size-4" /> Scanner
-            </TabsTrigger>
-            <TabsTrigger value="history" className="cursor-pointer gap-1.5">
-              <History className="size-4" /> History
-            </TabsTrigger>
-            <TabsTrigger value="roadmap" className="cursor-pointer gap-1.5">
-              <Map className="size-4" /> Roadmap
-            </TabsTrigger>
-          </TabsList>
+      <main className="mx-auto w-full max-w-6xl px-6 py-10">
+        <Tabs value={tab} onValueChange={setTab} className="gap-8">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Attack simulation workspace
+              </h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                Submit code you own. CrackScope simulates the attacks, you read the report.
+              </p>
+            </div>
+            <TabsList className="rounded-full">
+              <TabsTrigger value="scanner" className="gap-2 rounded-full">
+                <Radar className="size-4" /> Scanner
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-2 rounded-full">
+                <History className="size-4" /> History
+              </TabsTrigger>
+              <TabsTrigger value="roadmap" className="gap-2 rounded-full">
+                <ListChecks className="size-4" /> Roadmap
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          {/* Scanner tab */}
-          <TabsContent value="scan" className="mt-6">
-            <AnimatePresence mode="wait">
-              {phase !== "running" && (
-                <motion.div
-                  key="workspace"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex flex-col gap-4"
-                >
-                  <Card className="border-border/70 shadow-sm">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Radar className="size-4 text-primary" /> New attack simulation
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col gap-4">
-                      <div className="flex flex-col gap-3 sm:flex-row">
-                        <Input
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="Target name (e.g. checkout-service)"
-                          className="flex-1"
-                        />
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            addFiles(e.target.files);
-                            e.target.value = "";
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          className="cursor-pointer gap-1.5"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <FileCode2 className="size-4" /> Add files
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="cursor-pointer gap-1.5"
-                          onClick={() => setCode(SAMPLE_CODE)}
-                        >
-                          <FileWarning className="size-4" /> Load sample
-                        </Button>
-                      </div>
-
-                      {files.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {files.map((f, i) => (
-                            <Badge
-                              key={`${f.name}-${i}`}
-                              variant="secondary"
-                              className="cursor-pointer gap-1.5 pr-1.5"
-                            >
-                              {f.name}
-                              <button
-                                className="rounded-full p-0.5 hover:bg-foreground/10"
-                                onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
-                                aria-label={`Remove ${f.name}`}
-                              >
-                                ×
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-
-                      <Textarea
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        placeholder="Paste source code here — any language. The engine fires injection probes, secrets sweeps, crypto audits and config checks against it."
-                        className="min-h-[220px] resize-y font-mono text-[13px] leading-5"
+          {/* Scanner */}
+          <TabsContent value="scanner" className="space-y-8">
+            <div className="grid gap-6 lg:grid-cols-5">
+              <Card className="border-border/60 bg-card/60 lg:col-span-3">
+                <CardContent className="space-y-4 p-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Scan name</label>
+                      <Input
+                        value={scanName}
+                        onChange={(e) => setScanName(e.target.value)}
+                        placeholder="e.g. payments-service"
+                        className="rounded-lg"
                       />
-
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs text-muted-foreground">
-                          Only scan code you own or are authorized to test. Analysis runs locally in your browser.
-                        </p>
-                        <Button
-                          className="cursor-pointer gap-2 shadow-lg shadow-primary/20"
-                          onClick={runSimulation}
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Pasted file name</label>
+                      <Input
+                        value={fileName}
+                        onChange={(e) => setFileName(e.target.value)}
+                        placeholder="pasted.js"
+                        className="rounded-lg font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Code to attack</label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1.5 rounded-full text-xs text-muted-foreground"
+                        onClick={() => {
+                          setScanName((n) => n || "vulnerable-demo");
+                          setFileName(SAMPLE_NAME);
+                          setCodeText(SAMPLE_CODE);
+                        }}
+                      >
+                        <FlaskConical className="size-3.5" /> Load vulnerable demo
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={codeText}
+                      onChange={(e) => setCodeText(e.target.value)}
+                      placeholder={"// Paste source code here — JS/TS, Python, Go, Ruby, PHP, Java…\n// Nothing is uploaded until you save a report."}
+                      className="min-h-[220px] resize-y rounded-lg font-mono text-[13px] leading-5"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label>
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          void handleFiles(e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+                      <span className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-input bg-background px-4 text-sm font-medium shadow-xs hover:bg-secondary">
+                        <Upload className="size-4" /> Upload files
+                      </span>
+                    </label>
+                    <Button onClick={handleRun} disabled={running} className="gap-2 rounded-full scan-glow">
+                      <Play className="size-4" />
+                      {running ? "Attacking…" : "Run attack simulation"}
+                    </Button>
+                  </div>
+                  {uploaded.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {uploaded.map((f, i) => (
+                        <span
+                          key={`${f.name}-${i}`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1 font-mono text-xs"
                         >
-                          <Play className="size-4" /> Run attack simulation
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-
-              {phase === "running" && (
-                <motion.div
-                  key="running"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <Card className="border-border/70 shadow-sm">
-                    <CardContent className="p-8">
-                      <div className="flex items-center gap-3">
-                        <Loader2 className="size-5 animate-spin text-primary" />
-                        <p className="font-mono text-sm">Firing attack battery against {name || "target"}…</p>
-                      </div>
-                      <div className="mt-6 space-y-2.5 font-mono text-[13px]">
-                        {ATTACK_PHASES.map((p, i) => (
-                          <div
-                            key={p}
-                            className={cn(
-                              "flex items-center gap-2.5 transition-colors",
-                              i < phaseIdx ? "text-muted-foreground" : i === phaseIdx ? "text-primary" : "text-muted-foreground/40",
-                            )}
+                          <FileCode2 className="size-3 text-primary" />
+                          {f.name}
+                          <button
+                            className="ml-0.5 text-muted-foreground hover:text-foreground"
+                            onClick={() => setUploaded((prev) => prev.filter((_, j) => j !== i))}
+                            aria-label={`Remove ${f.name}`}
                           >
-                            {i < phaseIdx ? (
-                              <span className="text-primary">✓</span>
-                            ) : i === phaseIdx ? (
-                              <span className="relative flex size-2">
-                                <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
-                                <span className="relative inline-flex size-2 rounded-full bg-primary" />
-                              </span>
-                            ) : (
-                              <span className="size-2 rounded-full border border-current" />
-                            )}
-                            {p}
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-            {phase === "done" && report && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="mt-4"
-              >
-                <ScanReportView report={report} />
-              </motion.div>
-            )}
+              {/* Live stage console */}
+              <Card className="border-border/60 bg-card/60 lg:col-span-2">
+                <CardContent className="p-6">
+                  <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                    Attack console
+                  </p>
+                  <div className="mt-5 space-y-1">
+                    {STAGES.map((stage, i) => {
+                      const isActive = running && i === stageIdx;
+                      const isDone = stageIdx > i || (!running && result !== null);
+                      return (
+                        <div
+                          key={stage.id}
+                          className={`flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors ${
+                            isActive ? "bg-primary/10" : ""
+                          }`}
+                        >
+                          <span
+                            className={`mt-1 size-2 shrink-0 rounded-full ${
+                              isDone
+                                ? "bg-primary"
+                                : isActive
+                                  ? "animate-pulse bg-primary"
+                                  : "bg-muted-foreground/30"
+                            }`}
+                          />
+                          <div className="min-w-0">
+                            <p
+                              className={`font-mono text-sm ${
+                                isActive ? "font-medium text-primary" : isDone ? "text-foreground" : "text-muted-foreground"
+                              }`}
+                            >
+                              [{stage.id}] {stage.label}
+                            </p>
+                            {isActive && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{stage.detail}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {activeReport && <ScanReport data={activeReport} />}
           </TabsContent>
 
-          {/* History tab */}
-          <TabsContent value="history" className="mt-6">
+          {/* History */}
+          <TabsContent value="history" className="space-y-6">
             {scans === undefined ? (
-              <div className="flex items-center justify-center py-16 text-muted-foreground">
-                <Loader2 className="size-5 animate-spin" />
-              </div>
-            ) : viewedReport ? (
-              <div className="flex flex-col gap-4">
-                <Button
-                  variant="ghost"
-                  className="w-fit cursor-pointer gap-1.5"
-                  onClick={() => setViewingId(null)}
-                >
-                  ← Back to history
-                </Button>
-                <ScanReportView report={viewedReport} />
-              </div>
+              <p className="py-12 text-center text-sm text-muted-foreground">Loading history…</p>
             ) : scans.length === 0 ? (
-              <Card className="border-dashed border-border/70 shadow-none">
-                <CardContent className="flex flex-col items-center gap-2 py-14 text-center">
-                  <History className="size-8 text-muted-foreground/50" />
-                  <p className="text-sm font-medium">No scans yet</p>
-                  <p className="max-w-sm text-sm text-muted-foreground">
-                    Run your first attack simulation and every report will be archived here.
+              <Card className="border-border/60 bg-card/60">
+                <CardContent className="py-14 text-center">
+                  <History className="mx-auto size-8 text-muted-foreground/60" />
+                  <p className="mt-4 font-medium">No scans yet</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Run your first attack simulation and it will be saved here.
                   </p>
-                  <Button variant="outline" className="mt-2 cursor-pointer" onClick={() => setTab("scan")}>
+                  <Button variant="outline" className="mt-6 rounded-full" onClick={() => setTab("scanner")}>
                     Go to scanner
                   </Button>
                 </CardContent>
               </Card>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="space-y-3">
                 {scans.map((s) => (
-                  <Card
-                    key={s._id}
-                    className="cursor-pointer border-border/70 shadow-sm transition-colors hover:border-primary/30"
-                    onClick={() => setViewingId(s._id)}
-                  >
-                    <CardContent className="flex items-center gap-4 p-4">
+                  <Card key={s._id} className="border-border/60 bg-card/60">
+                    <CardContent className="flex flex-wrap items-center gap-4 p-5">
                       <span
-                        className={cn(
-                          "flex size-12 shrink-0 items-center justify-center rounded-xl text-lg font-semibold",
+                        className={`flex size-12 shrink-0 items-center justify-center rounded-xl font-semibold ${
                           s.score >= 75
                             ? "bg-primary/10 text-primary"
                             : s.score >= 50
-                              ? "bg-amber-500/10 text-amber-400"
-                              : "bg-red-500/10 text-red-400",
-                        )}
+                              ? "bg-[oklch(0.8_0.16_85)]/10 text-[oklch(0.82_0.14_85)]"
+                              : "bg-destructive/10 text-destructive"
+                        }`}
                       >
                         {s.grade}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">{s.name}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {new Date(s.createdAt).toLocaleString()} · {s.filesScanned} files ·{" "}
-                          {s.critical + s.high + s.medium + s.low + s.info} findings
+                        <p className="truncate font-medium">{s.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          score {s.score}/100 · {s.critical} critical · {s.high} high ·{" "}
+                          {s.medium} medium · {new Date(s.createdAt).toLocaleString()}
                         </p>
                       </div>
-                      <div className="hidden gap-1.5 sm:flex">
-                        {s.critical > 0 && (
-                          <Badge variant="outline" className="bg-red-500/15 text-red-400 border-red-500/30">
-                            {s.critical} crit
-                          </Badge>
-                        )}
-                        {s.high > 0 && (
-                          <Badge variant="outline" className="bg-orange-500/15 text-orange-400 border-orange-500/30">
-                            {s.high} high
-                          </Badge>
-                        )}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => {
+                            setViewing(toScanResult(s));
+                            setTab("scanner");
+                          }}
+                        >
+                          View report
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-full text-muted-foreground hover:text-destructive"
+                          onClick={() => void handleDelete(s._id)}
+                          aria-label="Delete scan"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0 cursor-pointer text-muted-foreground hover:text-red-400"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(s._id);
-                        }}
-                        aria-label="Delete scan"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
                     </CardContent>
                   </Card>
                 ))}
@@ -455,61 +456,9 @@ export default function Dashboard() {
             )}
           </TabsContent>
 
-          {/* Roadmap tab */}
-          <TabsContent value="roadmap" className="mt-6">
-            <div className="flex flex-col gap-8">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold tracking-tight">The 25-part build plan</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {SHIPPED_PARTS} of {TOTAL_PARTS} parts shipped. Each part lands as an increment you can use.
-                  </p>
-                </div>
-                <Badge variant="outline" className="gap-1.5 border-primary/30 text-primary">
-                  {SHIPPED_PARTS}/{TOTAL_PARTS} complete
-                </Badge>
-              </div>
-              {ROADMAP_PHASES.map((phase) => (
-                <div key={phase.phase}>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                    Phase {phase.phase} — {phase.name}
-                  </p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {phase.parts.map((part) => (
-                      <div
-                        key={part.part}
-                        className={cn(
-                          "rounded-xl border p-4",
-                          part.status === "shipped"
-                            ? "border-primary/40 bg-primary/5"
-                            : "border-border/70 bg-card",
-                        )}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-xs text-muted-foreground">
-                            #{String(part.part).padStart(2, "0")}
-                          </span>
-                          <span
-                            className={cn(
-                              "text-[10px] font-semibold uppercase tracking-wider",
-                              part.status === "shipped"
-                                ? "text-primary"
-                                : part.status === "up-next"
-                                  ? "text-amber-400"
-                                  : "text-muted-foreground/60",
-                            )}
-                          >
-                            {part.status === "shipped" ? "Shipped" : part.status === "up-next" ? "Up next" : "Planned"}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm font-medium">{part.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{part.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* Roadmap */}
+          <TabsContent value="roadmap">
+            <RoadmapView />
           </TabsContent>
         </Tabs>
       </main>

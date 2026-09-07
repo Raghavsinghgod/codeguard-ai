@@ -126,3 +126,20 @@
     cursor: pointer;
   }
 }
+
+@layer utilities {
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, oklch(1 0 0 / 3.5%) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(1 0 0 / 3.5%) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+  .scan-glow {
+    box-shadow:
+      0 0 0 1px oklch(0.78 0.13 168 / 22%),
+      0 0 42px -6px oklch(0.78 0.13 168 / 26%);
+  }
+  .text-glow {
+    text-shadow: 0 0 24px oklch(0.78 0.13 168 / 45%);
+  }
+}

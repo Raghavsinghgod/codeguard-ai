@@ -1,336 +1,370 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router";
 import {
-  ShieldCheck,
+  ArrowRight,
+  Bug,
   Crosshair,
   FileSearch,
-  Terminal,
-  ArrowRight,
-  Lock,
-  Bug,
+  Fingerprint,
+  Gauge,
   KeyRound,
   Radar,
-  ChevronRight,
+  ShieldCheck,
+  Swords,
+  Terminal,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import logo from "@/assets/logo.svg";
-import { ROADMAP_PHASES, TOTAL_PARTS, SHIPPED_PARTS } from "@/lib/roadmap";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ROADMAP_PHASES, SHIPPED_PARTS, TOTAL_PARTS } from "@/lib/roadmap";
+
+const fadeUp = {
+  initial: { opacity: 0, y: 24 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-80px" },
+  transition: { duration: 0.55, ease: "easeOut" as const },
+};
 
 const CAPABILITIES = [
   {
-    icon: Crosshair,
-    title: "Injection probes",
-    body: "SQL, command, and template injection payloads fired against string-built queries and shell calls.",
-  },
-  {
-    icon: Bug,
-    title: "XSS & deserialization",
-    body: "Raw-HTML sinks, prototype pollution, and unsafe deserialization gadget hunting.",
-  },
-  {
-    icon: KeyRound,
-    title: "Secrets sweep",
-    body: "Hardcoded API keys, tokens, passwords, and committed .env credentials.",
-  },
-  {
-    icon: Lock,
-    title: "Crypto audit",
-    body: "Weak hashes, predictable randomness, static IVs, and disabled TLS verification.",
-  },
-  {
-    icon: Radar,
+    icon: Swords,
     title: "Attack simulation",
-    body: "Every finding ships with the exact payload an attacker would try — and why it works.",
+    body: "Every finding ships with the exploitation path a pentester would attempt — payloads, bypass chains, and blast radius — for the code you submit.",
   },
   {
     icon: FileSearch,
-    title: "Pentest report",
-    body: "OWASP-mapped findings, severity scoring, simulated exploit narrative, and Markdown export.",
+    title: "Injection deep-scan",
+    body: "SQL, command, code, and template injection sinks detected across JS/TS, Python, and more — mapped to OWASP A03:2021.",
+  },
+  {
+    icon: KeyRound,
+    title: "Secrets & credentials",
+    body: "Hardcoded passwords, API keys, AWS key structures, and private key blocks flagged before they leak into git history.",
+  },
+  {
+    icon: Fingerprint,
+    title: "Auth & session attacks",
+    body: "JWT 'none'-alg forgery, weak randomness for tokens, and IDOR-style access-control gaps with proof-of-concept requests.",
+  },
+  {
+    icon: Radar,
+    title: "SSRF & network surface",
+    body: "User-controlled outbound requests flagged with the internal-network pivots (metadata endpoints, admin panels) they enable.",
+  },
+  {
+    icon: Gauge,
+    title: "Scored pentest report",
+    body: "A weighted 0–100 security score with letter grade, severity breakdown, remediations, and Markdown export.",
   },
 ];
 
-const TERMINAL_LINES = [
-  { text: "$ crackscope run ./checkout-service", tone: "cmd" },
-  { text: "▸ Recon — 14 files, 2,318 lines fingerprinted", tone: "dim" },
-  { text: "▸ Injection probes — SQL sink hit at billing.ts:41", tone: "warn" },
-  { text: "▸ Secrets sweep — AWS key committed at .env:3", tone: "crit" },
-  { text: "▸ Crypto audit — Math.random() token at auth.ts:88", tone: "warn" },
-  { text: "✓ Report ready — score 34/100 · 2 critical · 3 high", tone: "ok" },
-] as const;
-
-function toneClass(tone: string) {
-  if (tone === "cmd") return "text-foreground";
-  if (tone === "crit") return "text-red-400";
-  if (tone === "warn") return "text-amber-400";
-  if (tone === "ok") return "text-primary";
-  return "text-muted-foreground";
-}
+const STAGES = [
+  { id: "recon", label: "Recon & fingerprint" },
+  { id: "probes", label: "Injection probes" },
+  { id: "auth", label: "Auth & session attacks" },
+  { id: "crypto", label: "Crypto & secrets sweep" },
+  { id: "report", label: "Report generation" },
+];
 
 export default function Landing() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link to="/" className="flex items-center gap-2.5">
-            <img src={logo} alt="CrackScope" className="size-8 rounded-lg" />
-            <span className="text-[15px] font-semibold tracking-tight">CrackScope</span>
-            <Badge variant="secondary" className="ml-1 hidden sm:inline-flex">
-              Part 1 / {TOTAL_PARTS}
-            </Badge>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/30">
+              <Crosshair className="size-4.5 text-primary" />
+            </div>
+            <span className="text-[15px] font-semibold tracking-tight">
+              CrackScope
+            </span>
           </Link>
-          <nav className="flex items-center gap-1">
-            <a
-              href="#capabilities"
-              className="hidden rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:block"
-            >
-              Capabilities
-            </a>
-            <a
-              href="#roadmap"
-              className="hidden rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:block"
-            >
-              Roadmap
-            </a>
-            <Button asChild className="ml-2 cursor-pointer gap-1.5">
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" className="text-muted-foreground hover:text-foreground">
+              <Link to="/dashboard">Open app</Link>
+            </Button>
+            <Button asChild className="rounded-full px-4">
               <Link to="/auth">
-                Launch scanner <ArrowRight className="size-4" />
+                Start free <ArrowRight className="size-4" />
               </Link>
             </Button>
-          </nav>
+          </div>
         </div>
       </header>
 
       {/* Hero */}
       <section className="relative overflow-hidden">
+        <div className="grid-bg absolute inset-0" />
         <div
-          className="pointer-events-none absolute inset-0 -z-10 opacity-40"
-          style={{
-            background:
-              "radial-gradient(600px 320px at 50% -60px, var(--primary) 0%, transparent 70%)",
-          }}
+          className="absolute left-1/2 top-[-260px] h-[420px] w-[720px] -translate-x-1/2 rounded-full opacity-40 blur-3xl"
+          style={{ background: "radial-gradient(closest-side, oklch(0.78 0.13 168 / 0.35), transparent)" }}
         />
-        <div className="mx-auto grid w-full max-w-6xl gap-12 px-6 pb-20 pt-20 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:pb-28 lg:pt-28">
-          <div>
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+        <div className="relative mx-auto max-w-6xl px-6 pb-20 pt-24 sm:pt-32">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="mx-auto max-w-3xl text-center"
+          >
+            <Badge
+              variant="outline"
+              className="mb-6 gap-2 rounded-full border-primary/30 bg-primary/10 px-3 py-1 text-[13px] text-primary"
             >
-              <Badge variant="outline" className="mb-5 gap-1.5 border-primary/30 text-primary">
-                <ShieldCheck className="size-3.5" />
-                AI-assisted offensive security, pointed at your own code
-              </Badge>
-            </motion.div>
-            <motion.h1
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.05 }}
-              className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]"
-            >
-              Think like an attacker.
-              <br />
-              <span className="text-primary">Ship like an engineer.</span>
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.12 }}
-              className="mt-5 max-w-xl text-pretty text-[17px] leading-7 text-muted-foreground"
-            >
-              CrackScope runs a battery of simulated penetration tests against your
-              source code — injection, XSS, secrets, crypto misuse, broken auth —
-              then hands you a scored pentest report with the exact exploit an
-              attacker would attempt, and how to shut it down.
-            </motion.p>
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.18 }}
-              className="mt-8 flex flex-wrap items-center gap-3"
-            >
-              <Button asChild size="lg" className="cursor-pointer gap-2 shadow-lg shadow-primary/20">
+              <Terminal className="size-3.5" />
+              Part {SHIPPED_PARTS} of {TOTAL_PARTS} shipped — attack-simulation engine live
+            </Badge>
+            <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">
+              It attacks your code
+              <span className="text-glow block text-primary">before attackers do</span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
+              CrackScope is an automated red-team for your codebase. Submit any
+              source file and it simulates injection, auth-bypass, crypto, and
+              SSRF attacks — then hands you a scored pentest report with the
+              exact fixes.
+            </p>
+            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button asChild size="lg" className="h-12 rounded-full px-7 text-[15px] scan-glow">
                 <Link to="/auth">
                   Run your first scan <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="cursor-pointer gap-2">
-                <a href="#roadmap">
-                  See the 25-part plan <ChevronRight className="size-4" />
-                </a>
+              <Button asChild size="lg" variant="outline" className="h-12 rounded-full px-7 text-[15px]">
+                <Link to="/dashboard">See the workspace</Link>
               </Button>
-            </motion.div>
-            <p className="mt-5 text-xs text-muted-foreground">
-              Runs fully in your browser · nothing leaves your machine · no agents to install
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Free to try · No code leaves your browser until you save a report
             </p>
-          </div>
+          </motion.div>
 
-          {/* Terminal card */}
+          {/* Terminal mock */}
           <motion.div
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="relative"
+            transition={{ duration: 0.7, delay: 0.15, ease: "easeOut" }}
+            className="mx-auto mt-16 max-w-3xl"
           >
-            <div className="absolute -inset-3 -z-10 rounded-3xl bg-primary/10 blur-2xl" />
-            <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xl shadow-black/30">
-              <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
-                <span className="size-3 rounded-full bg-red-400/70" />
-                <span className="size-3 rounded-full bg-amber-400/70" />
-                <span className="size-3 rounded-full bg-emerald-400/70" />
-                <span className="ml-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Terminal className="size-3.5" /> crackscope — attack simulation
+            <Card className="overflow-hidden border-border/70 bg-card/80 shadow-2xl backdrop-blur scan-glow">
+              <div className="flex items-center gap-1.5 border-b border-border/60 px-4 py-3">
+                <span className="size-3 rounded-full bg-[oklch(0.65_0.2_25)]/70" />
+                <span className="size-3 rounded-full bg-[oklch(0.75_0.15_85)]/70" />
+                <span className="size-3 rounded-full bg-primary/70" />
+                <span className="ml-3 font-mono text-xs text-muted-foreground">
+                  crackscope scan ./server.js
                 </span>
               </div>
-              <div className="space-y-2.5 p-5 font-mono text-[13px] leading-relaxed">
-                {TERMINAL_LINES.map((l, i) => (
-                  <motion.p
-                    key={l.text}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 + i * 0.35, duration: 0.35 }}
-                    className={toneClass(l.tone)}
-                  >
-                    {l.text}
-                  </motion.p>
-                ))}
+              <div className="p-5 font-mono text-[13px] leading-6">
+                <p className="text-muted-foreground">→ 5 attack stages queued…</p>
+                <p className="text-foreground">
+                  <span className="text-primary">[recon]</span> 1 file · 38 lines · JavaScript
+                </p>
+                <p className="text-foreground">
+                  <span className="text-primary">[probes]</span> SQLi… CMD… XSS…
+                </p>
+                <p className="text-destructive">
+                  <span className="font-semibold">[!]</span> CMD-001 critical ·
+                  server.js:12 — command injection via exec(concat)
+                </p>
+                <p className="text-destructive">
+                  <span className="font-semibold">[!]</span> SEC-001 critical ·
+                  server.js:6 — hardcoded API key
+                </p>
+                <p className="text-[oklch(0.75_0.15_85)]">
+                  <span className="font-semibold">[~]</span> CRYPTO-002 high ·
+                  server.js:21 — Math.random() session token
+                </p>
+                <p className="mt-2 text-foreground">
+                  <span className="text-primary">score</span> 37/100 · grade{" "}
+                  <span className="text-destructive font-semibold">F</span> · 3
+                  findings
+                </p>
+                <p className="text-muted-foreground">
+                  report saved · simulated 14 attack paths · 0.9s
+                </p>
               </div>
-            </div>
+            </Card>
           </motion.div>
         </div>
       </section>
 
       {/* Capabilities */}
-      <section id="capabilities" className="border-t border-border/60 py-20">
-        <div className="mx-auto w-full max-w-6xl px-6">
-          <div className="max-w-2xl">
-            <p className="text-sm font-medium text-primary">Capabilities</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight">
-              A full pentest battery, on every scan
+      <section className="border-t border-border/50 py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              A full attack suite, one submission
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              The Part 1 engine simulates six attack classes over 20+ detection rules,
-              mapped to the OWASP Top 10. Deeper AST and AI analysis arrive in later parts.
+            <p className="mt-4 text-muted-foreground">
+              Six detection families modeled on how real pentesters work — each
+              finding verified against simulated exploitation, not just pattern
+              noise.
             </p>
-          </div>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {CAPABILITIES.map((c, i) => (
+          </motion.div>
+          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {CAPABILITIES.map((cap, i) => (
               <motion.div
-                key={c.title}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.45, delay: i * 0.06 }}
-                className="group rounded-2xl border border-border/70 bg-card p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+                key={cap.title}
+                {...fadeUp}
+                transition={{ ...fadeUp.transition, delay: i * 0.06 }}
               >
-                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
-                  <c.icon className="size-5" />
-                </div>
-                <h3 className="mt-4 text-[15px] font-semibold">{c.title}</h3>
-                <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{c.body}</p>
+                <Card className="group h-full border-border/60 bg-card/60 transition-colors hover:border-primary/40 hover:bg-card">
+                  <CardContent className="flex h-full flex-col gap-4 p-6">
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/25">
+                      <cap.icon className="size-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium tracking-tight">{cap.title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        {cap.body}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Roadmap */}
-      <section id="roadmap" className="border-t border-border/60 bg-secondary/40 py-20">
-        <div className="mx-auto w-full max-w-6xl px-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="max-w-2xl">
-              <p className="text-sm font-medium text-primary">The build plan</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight">
-                25 parts, shipped in the open
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                A full offensive-security platform is a long project. We build it in 25
-                parts — {SHIPPED_PARTS} shipped, the rest sequenced across five phases.
-              </p>
-            </div>
-            <div className="flex items-center gap-3 rounded-full border border-border/70 bg-card px-4 py-2 text-sm">
-              <span className="font-semibold text-primary">
-                {SHIPPED_PARTS}/{TOTAL_PARTS}
-              </span>
-              <span className="text-muted-foreground">parts complete</span>
-            </div>
-          </div>
-
-          <div className="mt-10 space-y-8">
-            {ROADMAP_PHASES.map((phase) => (
-              <div key={phase.phase}>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Phase {phase.phase} — {phase.name}
-                </p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                  {phase.parts.map((part) => (
-                    <div
-                      key={part.part}
-                      className={`rounded-xl border p-4 transition-colors ${
-                        part.status === "shipped"
-                          ? "border-primary/40 bg-primary/5"
-                          : "border-border/70 bg-card"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs text-muted-foreground">
-                          #{String(part.part).padStart(2, "0")}
-                        </span>
-                        <span
-                          className={`text-[10px] font-semibold uppercase tracking-wider ${
-                            part.status === "shipped"
-                              ? "text-primary"
-                              : part.status === "up-next"
-                                ? "text-amber-400"
-                                : "text-muted-foreground/60"
-                          }`}
-                        >
-                          {part.status === "shipped"
-                            ? "Shipped"
-                            : part.status === "up-next"
-                              ? "Up next"
-                              : "Planned"}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm font-medium leading-snug">{part.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        {part.description}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+      {/* How it works */}
+      <section className="border-t border-border/50 bg-secondary/30 py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              How a scan runs
+            </h2>
+            <p className="mt-4 text-muted-foreground">
+              Five red-team stages execute against your submission, in order —
+              you watch each one land, then read the report.
+            </p>
+          </motion.div>
+          <div className="mx-auto mt-14 max-w-3xl">
+            <ol className="relative space-y-0 border-l border-border/70 pl-0">
+              {STAGES.map((stage, i) => (
+                <motion.li
+                  key={stage.id}
+                  {...fadeUp}
+                  transition={{ ...fadeUp.transition, delay: i * 0.08 }}
+                  className="relative flex gap-4 pb-6 last:pb-0"
+                >
+                  <span className="absolute -left-[13px] flex size-6 items-center justify-center rounded-full border border-primary/40 bg-background font-mono text-[11px] text-primary">
+                    {i + 1}
+                  </span>
+                  <div className="ml-6 pt-0.5">
+                    <p className="font-mono text-sm font-medium text-foreground">
+                      {stage.label}
+                    </p>
+                  </div>
+                </motion.li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="border-t border-border/60 py-20">
-        <div className="mx-auto w-full max-w-3xl px-6 text-center">
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Find it before they do.
+      {/* Roadmap */}
+      <section className="border-t border-border/50 py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              Built in 25 parts
+            </h2>
+            <p className="mt-4 text-muted-foreground">
+              A platform this large ships in phases. Here is the full build
+              plan — {SHIPPED_PARTS} shipped, {TOTAL_PARTS - SHIPPED_PARTS} to
+              go, and the workspace tracks progress live.
+            </p>
+          </motion.div>
+          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {ROADMAP_PHASES.map((phase, i) => (
+              <motion.div
+                key={phase.phase}
+                {...fadeUp}
+                transition={{ ...fadeUp.transition, delay: i * 0.05 }}
+              >
+                <Card className="h-full border-border/60 bg-card/60">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                        Phase {phase.phase}
+                      </p>
+                      <span className="text-xs text-muted-foreground">
+                        {phase.parts.length} parts
+                      </span>
+                    </div>
+                    <h3 className="mt-2 font-medium tracking-tight">{phase.name}</h3>
+                    <ul className="mt-4 space-y-2.5">
+                      {phase.parts.slice(0, 4).map((part) => (
+                        <li key={part.part} className="flex items-start gap-2.5 text-sm">
+                          <span
+                            className={
+                              part.status === "shipped"
+                                ? "mt-1 size-1.5 shrink-0 rounded-full bg-primary"
+                                : part.status === "up-next"
+                                  ? "mt-1 size-1.5 shrink-0 rounded-full bg-[oklch(0.75_0.15_85)]"
+                                  : "mt-1 size-1.5 shrink-0 rounded-full bg-muted-foreground/40"
+                            }
+                          />
+                          <span className="leading-5">
+                            <span className="font-medium">{part.title}</span>
+                            {part.status === "shipped" && (
+                              <ShieldCheck className="ml-1.5 inline size-3.5 text-primary" />
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+            <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.2 }}>
+              <Card className="h-full border-primary/30 bg-primary/5">
+                <CardContent className="flex h-full flex-col p-6">
+                  <Bug className="size-5 text-primary" />
+                  <p className="mt-4 text-sm leading-6 text-muted-foreground">
+                    The full 25-part plan — including fuzzer, CI/CD guards,
+                    team workspaces, and the public API — lives in the
+                    workspace roadmap.
+                  </p>
+                  <Button asChild variant="outline" className="mt-auto w-fit gap-2 rounded-full">
+                    <Link to="/dashboard">
+                      View all 25 parts <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="border-t border-border/50 bg-secondary/30 py-24">
+        <motion.div
+          {...fadeUp}
+          className="mx-auto max-w-2xl px-6 text-center"
+        >
+          <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+            Your code has weaknesses. Find them first.
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-            Paste a file or drop in a snippet. CrackScope fires its full attack battery
-            and hands you the report in seconds.
+          <p className="mt-4 text-muted-foreground">
+            Sign in, paste a file, and watch the attack simulation run — free.
           </p>
-          <Button asChild size="lg" className="mt-8 cursor-pointer gap-2 shadow-lg shadow-primary/20">
+          <Button asChild size="lg" className="mt-8 h-12 rounded-full px-8 text-[15px] scan-glow">
             <Link to="/auth">
-              Start scanning free <ArrowRight className="size-4" />
+              Start scanning <ArrowRight className="size-4" />
             </Link>
           </Button>
-        </div>
+        </motion.div>
       </section>
 
-      <footer className="border-t border-border/60 py-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="" className="size-6 rounded-md" />
-            <span>CrackScope — simulated offensive security for your own code.</span>
-          </div>
-          <span>Use only on code you own or are authorized to test.</span>
+      <footer className="border-t border-border/50 py-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 text-xs text-muted-foreground">
+          <p>CrackScope — automated red-team for source code. Use on code you own.</p>
+          <p>Part {SHIPPED_PARTS}/{TOTAL_PARTS} · Build plan v1</p>
         </div>
       </footer>
     </div>
