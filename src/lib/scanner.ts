@@ -4,9 +4,9 @@
 // each confirmed weakness, and produces a pentest-style scored report.
 // Pure TypeScript so it runs instantly client-side; Part 8 (AI deep
 // analysis) will layer on top of this API.
-import { computeTaint, isLineTainted } from "@/lib/taint";
-import { detectSecrets } from "@/lib/secrets";
-import { auditDependencies } from "@/lib/deps";
+import { computeTaint, isLineTainted } from "./taint";
+import { detectSecrets } from "./secrets";
+import { auditDependencies } from "./deps";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 

@@ -69,6 +69,20 @@ export const getScan = query({
   },
 });
 
+export const saveAiAnalysis = mutation({
+  args: {
+    id: v.id("scans"),
+    aiAnalysis: v.string(), // raw JSON string of the DeepAnalysis object
+  },
+  handler: async (ctx, { id, aiAnalysis }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Not authenticated");
+    const scan = await ctx.db.get(id);
+    if (!scan || scan.userId !== userId) throw new Error("Scan not found");
+    await ctx.db.patch(id, { aiAnalysis });
+  },
+});
+
 export const deleteScan = mutation({
   args: { id: v.id("scans") },
   handler: async (ctx, { id }) => {

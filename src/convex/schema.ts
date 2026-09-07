@@ -69,7 +69,10 @@ const schema = defineSchema(
           payload: v.string(),
         }),
       ),
+      aiAnalysis: v.optional(v.string()), // Part 8: raw JSON of the AI deep analysis
     }).index("by_user", ["userId"]),
+    // aiAnalysis field: raw JSON string of the Part 8 AI deep analysis
+    // (narrative, verdicts, fix priorities) attached to a scan.
 
     // tableName: defineTable({
     //   ...

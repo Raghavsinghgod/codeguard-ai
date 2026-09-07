@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ScanReport } from "@/components/ScanReport";
+import { AiAnalysis } from "@/components/AiAnalysis";
 import { RoadmapView } from "@/components/RoadmapView";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
@@ -128,7 +129,8 @@ export default function Dashboard() {
   const [stageIdx, setStageIdx] = useState(-1);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [savedName, setSavedName] = useState<string | null>(null);
-  const [viewing, setViewing] = useState<{ name: string; result: ScanResult } | null>(null);
+  const [viewing, setViewing] = useState<{ name: string; result: ScanResult; id: Id<"scans"> | null; aiAnalysis: string | null } | null>(null);
+  const [savedScanId, setSavedScanId] = useState<Id<"scans"> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const scans = useQuery(api.scans.listScans, {});
@@ -199,6 +201,7 @@ export default function Dashboard() {
     setResult(null);
     setViewing(null);
     setSavedName(null);
+    setSavedScanId(null);
     setStageIdx(0);
     setRunning(true);
     let i = 0;
@@ -232,8 +235,9 @@ export default function Dashboard() {
       info: result.counts.info,
       findings: result.findings,
     })
-      .then(() => {
+      .then((id) => {
         setSavedName(scanName.trim() || `Scan ${new Date().toLocaleString()}`);
+        setSavedScanId(id);
         toast.success("Report saved to workspace history");
       })
       .catch(() => toast.error("Could not save the report"));
@@ -244,7 +248,8 @@ export default function Dashboard() {
     toast.success("Scan deleted");
   };
 
-  const activeReport = viewing ?? (result ? { name: scanName || "Untitled scan", result } : null);
+  const activeReport =
+    viewing ?? (result ? { name: scanName || "Untitled scan", result, id: savedScanId, aiAnalysis: null } : null);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -505,7 +510,19 @@ export default function Dashboard() {
               </Card>
             </div>
 
-            {activeReport && <ScanReport data={activeReport} />}
+            {activeReport && (
+              <>
+                <ScanReport data={activeReport} />
+                <div className="mt-6">
+                  <AiAnalysis
+                    name={activeReport.name}
+                    result={activeReport.result}
+                    scanId={activeReport.id}
+                    initialJson={activeReport.aiAnalysis}
+                  />
+                </div>
+              </>
+            )}
           </TabsContent>
 
           {/* History */}
@@ -554,7 +571,7 @@ export default function Dashboard() {
                           size="sm"
                           className="rounded-full"
                           onClick={() => {
-                            setViewing(toScanResult(s));
+                            setViewing({ ...toScanResult(s), id: s._id, aiAnalysis: s.aiAnalysis ?? null });
                             setTab("scanner");
                           }}
                         >

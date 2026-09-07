@@ -7,7 +7,7 @@
 // Placeholder/env-var/looks-fake values are suppressed to keep precision
 // high. Output uses the shared Finding shape so reports need no changes.
 
-import type { Finding, ScanInput, Severity } from "@/lib/scanner";
+import type { Finding, ScanInput, Severity } from "./scanner";
 
 const OWASP_A02 = "A02:2021 – Cryptographic Failures";
 const CATEGORY = "Sensitive Data Exposure";

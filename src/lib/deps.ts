@@ -5,7 +5,7 @@
 // supply-chain hygiene issues: unpinned deps, malicious install-script
 // patterns, and likely typosquatting. Produces the same Finding shape as
 // the source rules so everything flows into the pentest report.
-import type { Finding, ScanInput, Severity } from "@/lib/scanner";
+import type { Finding, ScanInput, Severity } from "./scanner";
 
 const OWASP_DEPS = "A06:2021 – Vulnerable and Outdated Components";
 const CATEGORY = "Vulnerable Dependencies";
