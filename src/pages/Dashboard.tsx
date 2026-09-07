@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
-import { Crosshair, FlaskConical, FolderOpen, Github, History, ListChecks, Loader2, LogOut, Play, Radar, Trash2, Upload } from "lucide-react";
+import { Crosshair, FlaskConical, FolderOpen, GitCompareArrows, Github, History, ListChecks, Loader2, LogOut, Minus, Play, Radar, Trash2, TrendingDown, TrendingUp, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ScanReport } from "@/components/ScanReport";
 import { AiAnalysis } from "@/components/AiAnalysis";
+import { DiffView } from "@/components/DiffView";
+import { diffScanResults, velocityStats } from "@/lib/diff";
 import { RoadmapView } from "@/components/RoadmapView";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
@@ -131,9 +133,17 @@ export default function Dashboard() {
   const [savedName, setSavedName] = useState<string | null>(null);
   const [viewing, setViewing] = useState<{ name: string; result: ScanResult; id: Id<"scans"> | null; aiAnalysis: string | null } | null>(null);
   const [savedScanId, setSavedScanId] = useState<Id<"scans"> | null>(null);
+  const [compareBaseId, setCompareBaseId] = useState<Id<"scans"> | null>(null);
+  const [diffPair, setDiffPair] = useState<
+    { baseName: string; base: ScanResult; currName: string; curr: ScanResult } | null
+  >(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const scans = useQuery(api.scans.listScans, {});
+  const velocity = useMemo(
+    () => (scans && scans.length >= 2 ? velocityStats(scans) : null),
+    [scans],
+  );
   const saveScan = useMutation(api.scans.saveScan);
   const deleteScan = useMutation(api.scans.deleteScan);
 
@@ -543,54 +553,172 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {scans.map((s) => (
-                  <Card key={s._id} className="border-border/60 bg-card/60">
-                    <CardContent className="flex flex-wrap items-center gap-4 p-5">
-                      <span
-                        className={`flex size-12 shrink-0 items-center justify-center rounded-xl font-semibold ${
-                          s.score >= 75
-                            ? "bg-primary/10 text-primary"
-                            : s.score >= 50
-                              ? "bg-[oklch(0.8_0.16_85)]/10 text-[oklch(0.82_0.14_85)]"
-                              : "bg-destructive/10 text-destructive"
-                        }`}
-                      >
-                        {s.grade}
-                      </span>
+              <>
+                {velocity && (
+                  <Card className="border-border/60 bg-card/60">
+                    <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{s.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          score {s.score}/100 · {s.critical} critical · {s.high} high ·{" "}
-                          {s.medium} medium · {new Date(s.createdAt).toLocaleString()}
+                        <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                          Remediation velocity
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {velocity.totalFixed} finding{velocity.totalFixed === 1 ? "" : "s"} fixed ·{" "}
+                          {velocity.totalAdded} introduced across {velocity.points.length - 1} scan
+                          transition{velocity.points.length === 2 ? "" : "s"} · net{" "}
+                          {velocity.netPerScan > 0 ? "+" : ""}
+                          {velocity.netPerScan} per scan
                         </p>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full"
-                          onClick={() => {
-                            setViewing({ ...toScanResult(s), id: s._id, aiAnalysis: s.aiAnalysis ?? null });
-                            setTab("scanner");
-                          }}
-                        >
-                          View report
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="rounded-full text-muted-foreground hover:text-destructive"
-                          onClick={() => void handleDelete(s._id)}
-                          aria-label="Delete scan"
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`shrink-0 gap-1.5 rounded-full capitalize ${
+                          velocity.verdict === "improving"
+                            ? "border-primary/30 bg-primary/10 text-primary"
+                            : velocity.verdict === "degrading"
+                              ? "border-destructive/40 bg-destructive/10 text-destructive"
+                              : "border-border bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {velocity.verdict === "improving" ? (
+                          <TrendingUp className="size-3.5" />
+                        ) : velocity.verdict === "degrading" ? (
+                          <TrendingDown className="size-3.5" />
+                        ) : (
+                          <Minus className="size-3.5" />
+                        )}
+                        {velocity.verdict}
+                      </Badge>
+                      <svg viewBox="0 0 240 40" className="h-10 w-full shrink-0 text-primary sm:w-64">
+                        <polyline
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          points={velocity.points
+                            .map(
+                              (p, i) =>
+                                `${(i / Math.max(velocity.points.length - 1, 1)) * 236 + 2},${38 - (p.score / 100) * 34}`,
+                            )
+                            .join(" ")}
+                        />
+                      </svg>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
+                )}
+
+                {diffPair && (
+                  <DiffView
+                    baselineName={diffPair.baseName}
+                    baseline={diffPair.base}
+                    currentName={diffPair.currName}
+                    current={diffPair.curr}
+                    diff={diffScanResults(diffPair.base, diffPair.curr)}
+                    onClose={() => {
+                      setDiffPair(null);
+                      setCompareBaseId(null);
+                    }}
+                  />
+                )}
+
+                {!diffPair &&
+                  compareBaseId &&
+                  (() => {
+                    const base = scans.find((x) => x._id === compareBaseId);
+                    return base ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+                        <span>
+                          Baseline selected: <span className="font-medium">{base.name}</span> — pick
+                          another scan to compare.
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 rounded-full text-xs"
+                          onClick={() => setCompareBaseId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : null;
+                  })()}
+
+                <div className="space-y-3">
+                  {scans.map((s) => (
+                    <Card key={s._id} className="border-border/60 bg-card/60">
+                      <CardContent className="flex flex-wrap items-center gap-4 p-5">
+                        <span
+                          className={`flex size-12 shrink-0 items-center justify-center rounded-xl font-semibold ${
+                            s.score >= 75
+                              ? "bg-primary/10 text-primary"
+                              : s.score >= 50
+                                ? "bg-[oklch(0.8_0.16_85)]/10 text-[oklch(0.82_0.14_85)]"
+                                : "bg-destructive/10 text-destructive"
+                          }`}
+                        >
+                          {s.grade}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{s.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            score {s.score}/100 · {s.critical} critical · {s.high} high ·{" "}
+                            {s.medium} medium · {new Date(s.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full"
+                            onClick={() => {
+                              setDiffPair(null);
+                              if (!compareBaseId) {
+                                setCompareBaseId(s._id);
+                                return;
+                              }
+                              const base = scans.find((x) => x._id === compareBaseId);
+                              setCompareBaseId(null);
+                              if (base && base._id !== s._id) {
+                                setDiffPair({
+                                  baseName: base.name,
+                                  base: toScanResult(base).result,
+                                  currName: s.name,
+                                  curr: toScanResult(s).result,
+                                });
+                              }
+                            }}
+                          >
+                            <GitCompareArrows className="size-3.5" />
+                            {compareBaseId && compareBaseId !== s._id && !diffPair
+                              ? "vs baseline"
+                              : "Compare"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full"
+                            onClick={() => {
+                              setViewing({ ...toScanResult(s), id: s._id, aiAnalysis: s.aiAnalysis ?? null });
+                              setTab("scanner");
+                            }}
+                          >
+                            View report
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full text-muted-foreground hover:text-destructive"
+                            onClick={() => void handleDelete(s._id)}
+                            aria-label="Delete scan"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </>
             )}
           </TabsContent>
 
