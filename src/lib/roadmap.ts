@@ -43,14 +43,14 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       p(7, "Dependency & supply-chain audit", "Vulnerable package versions, known CVE mapping, transitive risk, and lockfile analysis.", "shipped"),
       p(8, "AI deep analysis", "LLM review via the built-in AI gateway: contextual reasoning over findings, business-logic flaws, and plain-English exploitation narrative.", "shipped"),
       p(9, "OWASP Top 10 & CWE mapping", "Compliance view with coverage scores, standards mapping, and audit-ready summaries.", "shipped"),
-      p(10, "Hardening recommendations", "Auto-generated fixes with patch snippets, before/after code, and per-finding fix difficulty.", "up-next"),
+      p(10, "Hardening recommendations", "Auto-generated fixes with patch snippets, before/after code, and per-finding fix difficulty.", "shipped"),
     ],
   },
   {
     phase: 3,
     name: "Offensive modules",
     parts: [
-      p(11, "Triage workflow", "Mark false positives, accept risk, add notes, re-open, and assign owners.", "planned"),
+      p(11, "Triage workflow", "Mark false positives, accept risk, add notes, re-open, and assign owners.", "up-next"),
       p(12, "Scan history & diffing", "Compare scans over time, detect regressions, and track remediation velocity.", "planned"),
       p(13, "Fuzzing module", "Simulated input fuzzing of user-controlled flows with mutation strategies and crash-pattern heuristics.", "planned"),
       p(14, "Auth & session attacks", "JWT flaws, session fixation, IDOR hunting, and privilege-escalation patterns.", "planned"),

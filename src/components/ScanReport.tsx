@@ -6,6 +6,7 @@ import {
   FileText,
   ShieldCheck,
   Swords,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import { SimulationLab } from "@/components/SimulationLab";
 import { ComplianceView } from "@/components/ComplianceView";
 import { cweFor } from "@/lib/compliance";
+import { DIFFICULTY_CHIP, hardeningFor, hardeningPlan } from "@/lib/hardening";
 import type { ScanResult, Severity, Finding } from "@/lib/scanner";
 import {
   cvssFor,
@@ -101,6 +103,93 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
   );
 }
 
+function FixGuide({ finding }: { finding: Finding }) {
+  const guide = hardeningFor(finding);
+  return (
+    <div className="rounded-lg border border-[oklch(0.78_0.13_168)]/30 bg-[oklch(0.78_0.13_168)]/5 p-3.5">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <p className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-[oklch(0.72_0.14_168)]">
+          <Wrench className="size-3.5" /> Fix guide
+        </p>
+        <Badge variant="outline" className={`rounded-full capitalize ${DIFFICULTY_CHIP[guide.difficulty]}`}>
+          {guide.difficulty}
+        </Badge>
+        <span className="font-mono text-[11px] text-muted-foreground">est. {guide.effort}</span>
+      </div>
+      <ol className="space-y-1.5">
+        {guide.steps.map((step, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm leading-6">
+            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-[oklch(0.72_0.14_168)]" />
+            <span className="text-foreground/90">{step}</span>
+          </li>
+        ))}
+      </ol>
+      {guide.before && guide.after && (
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          <div>
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-destructive/80">Before</p>
+            <pre className="overflow-x-auto rounded-lg border border-destructive/25 bg-secondary/60 p-2.5 font-mono text-xs leading-5 line-through decoration-destructive/50">
+              {guide.before}
+            </pre>
+          </div>
+          <div>
+            <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-primary">After</p>
+            <pre className="overflow-x-auto rounded-lg border border-primary/25 bg-secondary/60 p-2.5 font-mono text-xs leading-5">
+              {guide.after}
+            </pre>
+          </div>
+        </div>
+      )}
+      <p className="mt-2.5 text-xs leading-5 text-muted-foreground">
+        <span className="font-medium text-foreground/80">Verify:</span> {guide.verify}
+      </p>
+    </div>
+  );
+}
+
+function HardeningPlanCard({ result }: { result: ScanResult }) {
+  const plan = hardeningPlan(result);
+  if (plan.items.length === 0) return null;
+  const quickWins = plan.counts.trivial + plan.counts.easy;
+  return (
+    <div>
+      <div className="mb-4 flex items-center gap-3">
+        <h3 className="text-lg font-semibold tracking-tight">Hardening plan</h3>
+        <Separator className="flex-1" />
+        <span className="font-mono text-xs text-muted-foreground">
+          {plan.items.length} fix{plan.items.length === 1 ? "" : "es"} · {quickWins} quick win
+          {quickWins === 1 ? "" : "s"}
+        </span>
+      </div>
+      <Card className="border-border/60 bg-card/70">
+        <CardContent className="p-0">
+          {plan.items.map((item, i) => (
+            <div
+              key={item.ruleId}
+              className={`flex flex-wrap items-center gap-3 px-5 py-3.5 ${
+                i > 0 ? "border-t border-border/50" : ""
+              }`}
+            >
+              <span className="w-6 shrink-0 text-center font-mono text-sm text-muted-foreground">{i + 1}</span>
+              <span className={`size-2 shrink-0 rounded-full ${SEVERITY_STYLE[item.severity].dot}`} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{item.title}</p>
+                <p className="truncate font-mono text-xs text-muted-foreground">
+                  {item.ruleId} · {item.occurrences} location{item.occurrences === 1 ? "" : "s"} ·{" "}
+                  {item.files.join(", ")} · est. {item.effort}
+                </p>
+              </div>
+              <Badge variant="outline" className={`shrink-0 rounded-full capitalize ${DIFFICULTY_CHIP[item.difficulty]}`}>
+                {item.difficulty}
+              </Badge>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function FindingCard({ finding, index }: { finding: Finding; index: number }) {
   const [open, setOpen] = useState(index < 3);
   const [labOpen, setLabOpen] = useState(false);
@@ -160,6 +249,7 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
               </p>
               <p className="text-sm leading-6 text-foreground/90">{finding.remediation}</p>
             </div>
+            <FixGuide finding={finding} />
             <div className="flex justify-end">
               <Button size="sm" className="gap-2 rounded-full scan-glow" onClick={() => setLabOpen(true)}>
                 <Swords className="size-4" /> Try to crack
@@ -281,6 +371,8 @@ export function ScanReport({ data }: { data: ScanReportData }) {
         </div>
         <ComplianceView result={result} />
       </div>
+
+      <HardeningPlanCard result={result} />
 
       <div>
         <div className="mb-4 flex items-center gap-3">
