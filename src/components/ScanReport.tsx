@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useMutation, useQuery } from "convex/react";
+import { EyeOff } from "lucide-react";
 import {
   ChevronDown,
   Download,
@@ -24,6 +26,10 @@ import { SimulationLab } from "@/components/SimulationLab";
 import { ComplianceView } from "@/components/ComplianceView";
 import { cweFor } from "@/lib/compliance";
 import { DIFFICULTY_CHIP, hardeningFor, hardeningPlan } from "@/lib/hardening";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { TriageBar, TRIAGE_BADGE, type TriageState } from "@/components/TriageBar";
+import { verdictKey } from "@/lib/ai";
 import type { ScanResult, Severity, Finding } from "@/lib/scanner";
 import {
   cvssFor,
@@ -190,10 +196,23 @@ function HardeningPlanCard({ result }: { result: ScanResult }) {
   );
 }
 
-function FindingCard({ finding, index }: { finding: Finding; index: number }) {
+function FindingCard({
+  finding,
+  index,
+  triage,
+  triageDisabled,
+  onTriage,
+}: {
+  finding: Finding;
+  index: number;
+  triage: TriageState;
+  triageDisabled: boolean;
+  onTriage: (patch: Partial<TriageState>) => void;
+}) {
   const [open, setOpen] = useState(index < 3);
   const [labOpen, setLabOpen] = useState(false);
   const style = SEVERITY_STYLE[finding.severity];
+  const triagedBadge = triage.status !== "open" ? TRIAGE_BADGE[triage.status] : null;
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -216,6 +235,11 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
           <Badge variant="outline" className={`shrink-0 rounded-full capitalize ${style.chip}`}>
             {finding.severity}
           </Badge>
+          {triagedBadge && (
+            <Badge variant="outline" className={`shrink-0 rounded-full text-[11px] ${triagedBadge.chip}`}>
+              {triagedBadge.label}
+            </Badge>
+          )}
           <Badge variant="outline" className="hidden shrink-0 rounded-full font-mono text-[11px] text-muted-foreground md:inline-flex">
             {cvssFor(finding).score} · CVSS-style
           </Badge>
@@ -250,6 +274,7 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
               <p className="text-sm leading-6 text-foreground/90">{finding.remediation}</p>
             </div>
             <FixGuide finding={finding} />
+            <TriageBar disabled={triageDisabled} state={triage} onPatch={onTriage} />
             <div className="flex justify-end">
               <Button size="sm" className="gap-2 rounded-full scan-glow" onClick={() => setLabOpen(true)}>
                 <Swords className="size-4" /> Try to crack
@@ -279,10 +304,49 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
 export interface ScanReportData {
   name: string;
   result: ScanResult;
+  /** Convex scan row id — enables the Part 11 triage workflow when present. */
+  id?: Id<"scans"> | null;
 }
 
 export function ScanReport({ data }: { data: ScanReportData }) {
   const { name, result } = data;
+  const scanId = data.id ?? null;
+  const setTriage = useMutation(api.scans.setTriage);
+  const triageRows = useQuery(
+    api.scans.listTriage,
+    scanId ? { scanId } : "skip",
+  );
+  const triageMap = useMemo(() => {
+    const map = new Map<string, TriageState>();
+    for (const row of triageRows ?? []) {
+      map.set(row.key, { status: row.status, note: row.note, owner: row.owner });
+    }
+    return map;
+  }, [triageRows]);
+  const [hideFp, setHideFp] = useState(false);
+
+  const onTriage = (key: string, patch: Partial<TriageState>) => {
+    if (!scanId) return;
+    const current = triageMap.get(key) ?? { status: "open" as const };
+    const next = { ...current, ...patch };
+    triageMap.set(key, next);
+    setTriage({
+      scanId,
+      key,
+      status: next.status,
+      note: next.note || undefined,
+      owner: next.owner || undefined,
+    }).catch(() => toast.error("Could not save triage state"));
+  };
+
+  const isFp = (f: Finding) => (triageMap.get(verdictKey(f))?.status ?? "open") === "false_positive";
+  const fpCount = result.findings.filter(isFp).length;
+  const visibleFindings = hideFp ? result.findings.filter((f) => !isFp(f)) : result.findings;
+  const actionableResult = useMemo(
+    () => ({ ...result, findings: result.findings.filter((f) => !isFp(f)) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [result, triageMap],
+  );
   const severities: Severity[] = ["critical", "high", "medium", "low", "info"];
   const rating = riskRating(result);
   const summary = executiveSummary(result);
@@ -372,12 +436,26 @@ export function ScanReport({ data }: { data: ScanReportData }) {
         <ComplianceView result={result} />
       </div>
 
-      <HardeningPlanCard result={result} />
+      <HardeningPlanCard result={actionableResult} />
 
       <div>
         <div className="mb-4 flex items-center gap-3">
           <h3 className="text-lg font-semibold tracking-tight">Findings</h3>
           <Separator className="flex-1" />
+          <span className="font-mono text-xs text-muted-foreground">
+            {visibleFindings.length} actionable
+            {fpCount > 0 ? ` · ${fpCount} false positive${fpCount === 1 ? "" : "s"}` : ""}
+          </span>
+          {fpCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-7 gap-1.5 rounded-full text-xs ${hideFp ? "text-primary" : "text-muted-foreground"}`}
+              onClick={() => setHideFp((v) => !v)}
+            >
+              <EyeOff className="size-3.5" /> {hideFp ? "Show" : "Hide"} false positives
+            </Button>
+          )}
         </div>
         {result.findings.length === 0 ? (
           <Card className="border-primary/30 bg-primary/5">
@@ -392,10 +470,25 @@ export function ScanReport({ data }: { data: ScanReportData }) {
               </div>
             </CardContent>
           </Card>
+        ) : visibleFindings.length === 0 ? (
+          <Card className="border-border/60 bg-card/60">
+            <CardContent className="py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                All findings are triaged as false positives. Toggle visibility above to review them.
+              </p>
+            </CardContent>
+          </Card>
         ) : (
           <div className="space-y-3">
-            {result.findings.map((f, i) => (
-              <FindingCard key={`${f.ruleId}-${f.file}-${f.line}-${i}`} finding={f} index={i} />
+            {visibleFindings.map((f, i) => (
+              <FindingCard
+                key={`${f.ruleId}-${f.file}-${f.line}-${i}`}
+                finding={f}
+                index={i}
+                triage={triageMap.get(verdictKey(f)) ?? { status: "open" }}
+                triageDisabled={!scanId}
+                onTriage={(patch) => onTriage(verdictKey(f), patch)}
+              />
             ))}
           </div>
         )}

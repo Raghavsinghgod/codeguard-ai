@@ -74,6 +74,22 @@ const schema = defineSchema(
     // aiAnalysis field: raw JSON string of the Part 8 AI deep analysis
     // (narrative, verdicts, fix priorities) attached to a scan.
 
+    //    // Part 11: per-finding triage state (false positives, accepted risk,
+    // notes, owners). One row per (scanId, findingKey = "ruleId|file|line").
+    triage: defineTable({
+      userId: v.id("users"),
+      scanId: v.id("scans"),
+      key: v.string(),
+      status: v.union(
+        v.literal("open"),
+        v.literal("false_positive"),
+        v.literal("accepted_risk"),
+      ),
+      note: v.optional(v.string()),
+      owner: v.optional(v.string()),
+      updatedAt: v.number(),
+    }).index("by_scan", ["scanId"]),
+
     // tableName: defineTable({
     //   ...
     //   // table fields
