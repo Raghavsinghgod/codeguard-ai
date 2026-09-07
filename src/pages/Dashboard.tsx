@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
-import { FlaskConical, FolderOpen, Github, History, ListChecks, Loader2, LogOut, Play, Radar, Trash2, Upload } from "lucide-react";
+import { Crosshair, FlaskConical, FolderOpen, Github, History, ListChecks, Loader2, LogOut, Play, Radar, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -324,35 +324,104 @@ export default function Dashboard() {
                       className="min-h-[220px] resize-y rounded-lg font-mono text-[13px] leading-5"
                     />
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label>
-                      <input
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          void handleFiles(e.target.files);
-                          e.target.value = "";
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragging(false);
+                      void handleFiles(Array.from(e.dataTransfer.files));
+                    }}
+                    className={`rounded-xl border border-dashed p-4 transition-colors ${
+                      dragging ? "border-primary bg-primary/10" : "border-border bg-secondary/30"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Upload className="size-5 shrink-0 text-primary" />
+                      <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+                        Drag & drop files, a folder, or a <span className="font-medium text-foreground">.zip</span> here
+                      </p>
+                      <label>
+                        <input
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            void handleFiles(Array.from(e.target.files ?? []));
+                            e.target.value = "";
+                          }}
+                        />
+                        <span className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-input bg-background px-3 text-xs font-medium shadow-xs hover:bg-secondary">
+                          <Upload className="size-3.5" /> Files
+                        </span>
+                      </label>
+                      <label>
+                        <input
+                          type="file"
+                          multiple
+                          className="hidden"
+                          {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+                          onChange={(e) => {
+                            void handleFiles(Array.from(e.target.files ?? []));
+                            e.target.value = "";
+                          }}
+                        />
+                        <span className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-input bg-background px-3 text-xs font-medium shadow-xs hover:bg-secondary">
+                          <FolderOpen className="size-3.5" /> Folder
+                        </span>
+                      </label>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-3">
+                      <Github className="size-4 shrink-0 text-muted-foreground" />
+                      <Input
+                        value={repoUrl}
+                        onChange={(e) => setRepoUrl(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !repoLoading) void handleFetchRepo();
                         }}
+                        placeholder="github.com/owner/repo — or owner/repo (public)"
+                        className="h-8 min-w-0 flex-1 rounded-full bg-background px-3 text-xs"
+                        disabled={repoLoading}
                       />
-                      <span className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-input bg-background px-4 text-sm font-medium shadow-xs hover:bg-secondary">
-                        <Upload className="size-4" /> Upload files
-                      </span>
-                    </label>
-                    <Button onClick={handleRun} disabled={running} className="gap-2 rounded-full scan-glow">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 rounded-full px-3 text-xs"
+                        disabled={repoLoading}
+                        onClick={() => void handleFetchRepo()}
+                      >
+                        {repoLoading ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          "Fetch repo"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button onClick={handleRun} disabled={!canRun} className="gap-2 rounded-full scan-glow">
                       <Play className="size-4" />
-                      {running ? "Attacking…" : "Run attack simulation"}
+                      {running ? "Attacking…" : `Run attack simulation${queuedCount > 0 ? ` (${queuedCount})` : ""}`}
                     </Button>
+                    {uploaded.length > 0 && (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {summarizeInputs(uploaded)}
+                      </span>
+                    )}
                   </div>
                   {uploaded.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
+                    <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto pt-1">
                       {uploaded.map((f, i) => (
                         <span
                           key={`${f.name}-${i}`}
                           className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1 font-mono text-xs"
                         >
-                          <FileCode2 className="size-3 text-primary" />
-                          {f.name}
+                          {f.name.split("/").pop()}
+                          <span className="text-muted-foreground/70">{f.name.split("/").slice(0, -1).join("/")}</span>
                           <button
                             className="ml-0.5 text-muted-foreground hover:text-foreground"
                             onClick={() => setUploaded((prev) => prev.filter((_, j) => j !== i))}
