@@ -32,14 +32,14 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       p(2, "Code intake", "Multi-file paste, drag-and-drop upload, folder zips, and GitHub repo/URL ingestion with language auto-detection.", "shipped"),
       p(3, "Static analysis engine v1", "AST-aware detectors per language, taint tracking from sources to sinks, and dramatically fewer false positives.", "shipped"),
       p(4, "Attack simulation lab v1", "Per-finding exploit generation: live payload crafting, exploit chains, and a sandboxed 'try to crack' replay view.", "shipped"),
-      p(5, "Pentest report generator", "Executive summary, CVSS-style scoring, methodology section, and export to Markdown/PDF.", "up-next"),
+      p(5, "Pentest report generator", "Executive summary, CVSS-style scoring, methodology section, and export to Markdown/PDF.", "shipped"),
     ],
   },
   {
     phase: 2,
     name: "Detection core",
     parts: [
-      p(6, "Secrets & credentials scanner", "Entropy analysis plus provider-specific patterns for API keys, tokens, and private keys, with git-history awareness.", "planned"),
+      p(6, "Secrets & credentials scanner", "Entropy analysis plus provider-specific patterns for API keys, tokens, and private keys, with git-history awareness.", "up-next"),
       p(7, "Dependency & supply-chain audit", "Vulnerable package versions, known CVE mapping, transitive risk, and lockfile analysis.", "planned"),
       p(8, "AI deep analysis", "LLM review via the built-in AI gateway: contextual reasoning over findings, business-logic flaws, and plain-English exploitation narrative.", "planned"),
       p(9, "OWASP Top 10 & CWE mapping", "Compliance view with coverage scores, standards mapping, and audit-ready summaries.", "planned"),

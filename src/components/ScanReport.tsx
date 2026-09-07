@@ -3,9 +3,11 @@ import { motion } from "framer-motion";
 import {
   ChevronDown,
   Download,
+  FileText,
   ShieldCheck,
   Swords,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,7 +21,13 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SimulationLab } from "@/components/SimulationLab";
 import type { ScanResult, Severity, Finding } from "@/lib/scanner";
-import { buildMarkdownReport } from "@/lib/scanner";
+import {
+  cvssFor,
+  executiveSummary,
+  exportMarkdown,
+  exportPdf,
+  riskRating,
+} from "@/lib/report";
 
 export const SEVERITY_STYLE: Record<Severity, { dot: string; text: string; chip: string }> = {
   critical: {
@@ -117,6 +125,9 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
           <Badge variant="outline" className={`shrink-0 rounded-full capitalize ${style.chip}`}>
             {finding.severity}
           </Badge>
+          <Badge variant="outline" className="hidden shrink-0 rounded-full font-mono text-[11px] text-muted-foreground md:inline-flex">
+            {cvssFor(finding).score} · CVSS-style
+          </Badge>
           <ChevronDown
             className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
           />
@@ -180,15 +191,14 @@ export interface ScanReportData {
 export function ScanReport({ data }: { data: ScanReportData }) {
   const { name, result } = data;
   const severities: Severity[] = ["critical", "high", "medium", "low", "info"];
+  const rating = riskRating(result);
+  const summary = executiveSummary(result);
 
-  const download = () => {
-    const blob = new Blob([buildMarkdownReport(name, result)], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `crackscope-report-${name.replace(/\W+/g, "-").toLowerCase()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handlePdf = () => {
+    const opened = exportPdf(name, result);
+    if (!opened) {
+      toast.info("Pop-up blocked — downloaded the report as HTML instead. Open it and print to PDF.");
+    }
   };
 
   return (
@@ -211,6 +221,18 @@ export function ScanReport({ data }: { data: ScanReportData }) {
                 {result.findings.length} finding{result.findings.length === 1 ? "" : "s"} ·
                 simulated in {result.durationMs}ms
               </p>
+              <Badge
+                variant="outline"
+                className={`rounded-full capitalize ${
+                  rating === "Critical" || rating === "High"
+                    ? SEVERITY_STYLE[rating === "Critical" ? "critical" : "high"].chip
+                    : rating === "Moderate"
+                      ? SEVERITY_STYLE.medium.chip
+                      : SEVERITY_STYLE.low.chip
+                }`}
+              >
+                risk rating: {rating}
+              </Badge>
             </div>
           </div>
           <div className="flex flex-1 flex-wrap items-center justify-start gap-2.5 sm:justify-end">
@@ -223,9 +245,29 @@ export function ScanReport({ data }: { data: ScanReportData }) {
               </div>
             ))}
           </div>
-          <Button variant="outline" onClick={download} className="gap-2 shrink-0 rounded-full">
-            <Download className="size-4" /> Export .md
-          </Button>
+          <div className="flex shrink-0 flex-col gap-2">
+            <Button variant="outline" onClick={() => exportMarkdown(name, result)} className="gap-2 rounded-full">
+              <Download className="size-4" /> Export .md
+            </Button>
+            <Button variant="outline" onClick={handlePdf} className="gap-2 rounded-full">
+              <FileText className="size-4" /> Export PDF
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/60 bg-card/70">
+        <CardContent className="p-6">
+          <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            Executive summary
+          </p>
+          <div className="mt-2 space-y-2.5">
+            {summary.map((p, i) => (
+              <p key={i} className="text-sm leading-6 text-muted-foreground">
+                {p}
+              </p>
+            ))}
+          </div>
         </CardContent>
       </Card>
 

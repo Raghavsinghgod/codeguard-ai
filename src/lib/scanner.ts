@@ -458,48 +458,5 @@ export function scan(inputs: ScanInput[]): ScanResult {
   };
 }
 
-export function buildMarkdownReport(name: string, result: ScanResult): string {
-  const lines: string[] = [];
-  lines.push(`# CrackScope Pentest Report — ${name}`);
-  lines.push("");
-  lines.push(`Generated: ${new Date().toISOString()}`);
-  lines.push(
-    `Scope: ${result.filesScanned} file(s), ${result.linesScanned} lines (${result.languages.join(", ") || "n/a"})`,
-  );
-  lines.push(`Security score: ${result.score}/100 (grade ${result.grade})`);
-  lines.push(
-    `Findings: ${result.counts.critical} critical · ${result.counts.high} high · ${result.counts.medium} medium · ${result.counts.low} low`,
-  );
-  lines.push("");
-  lines.push("## Executive summary");
-  lines.push(
-    result.counts.critical > 0
-      ? "Critical-severity weaknesses were identified that are realistically exploitable. Remediation should be treated as an emergency: contain exposure, rotate any leaked credentials, and apply the fixes below before the next release."
-      : result.counts.high > 0
-        ? "No critical weaknesses were found, but high-severity issues require prompt remediation and follow-up verification."
-        : "No high or critical weaknesses were detected in the analyzed scope. Continue periodic testing as code changes.",
-  );
-  lines.push("");
-  lines.push("## Methodology");
-  lines.push(
-    "Automated attack simulation with taint-tracked dataflow: user-controlled sources (request params, bodies, forms, argv) are propagated through local assignments, and injection/XSS/command sinks only report on confirmed source→sink flows. Weakness classes cover injection, XSS, cryptography, authentication, access control, SSRF, deserialization, and misconfiguration (OWASP Top 10 2021 mapped). Each finding includes a simulated exploitation path.",
-  );
-  lines.push("");
-  lines.push("## Findings");
-  if (result.findings.length === 0) {
-    lines.push("No findings. 🎉");
-  }
-  result.findings.forEach((f, i) => {
-    lines.push("");
-    lines.push(`### ${i + 1}. [${f.severity.toUpperCase()}] ${f.title}`);
-    lines.push(`- Rule: ${f.ruleId} · Category: ${f.category} · ${f.owasp}`);
-    lines.push(`- Location: ${f.file}:${f.line}`);
-    lines.push("```");
-    lines.push(f.snippet);
-    lines.push("```");
-    lines.push(f.description);
-    lines.push(`- Simulated attack: ${f.payload.replace(/\n/g, " / ")}`);
-    lines.push(`- Remediation: ${f.remediation}`);
-  });
-  return lines.join("\n");
-}
+// Part 5: report building moved to src/lib/report.ts
+// (CVSS-style scoring, executive summary, Markdown + print-ready HTML export).
