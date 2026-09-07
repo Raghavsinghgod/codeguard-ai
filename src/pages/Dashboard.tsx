@@ -2,18 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
-import {
-  Crosshair,
-  FileCode2,
-  FlaskConical,
-  History,
-  ListChecks,
-  LogOut,
-  Play,
-  Radar,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { FlaskConical, FolderOpen, Github, History, ListChecks, Loader2, LogOut, Play, Radar, Trash2, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +15,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { scan, type ScanInput, type ScanResult } from "@/lib/scanner";
+import {
+  fetchGithubRepo,
+  intakeFiles,
+  parseGithubTarget,
+  summarizeInputs,
+} from "@/lib/intake";
 
 const STAGES = [
   { id: "recon", label: "Recon & fingerprint", detail: "Detecting languages, entry points, and data flows…" },
@@ -108,6 +103,9 @@ export default function Dashboard() {
   const [fileName, setFileName] = useState("pasted.js");
   const [codeText, setCodeText] = useState("");
   const [uploaded, setUploaded] = useState<ScanInput[]>([]);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [repoLoading, setRepoLoading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [running, setRunning] = useState(false);
   const [stageIdx, setStageIdx] = useState(-1);
   const [result, setResult] = useState<ScanResult | null>(null);
@@ -130,15 +128,46 @@ export default function Dashboard() {
     navigate("/");
   };
 
-  const handleFiles = async (fileList: FileList | null) => {
-    if (!fileList?.length) return;
-    const inputs: ScanInput[] = [];
-    for (const file of Array.from(fileList).slice(0, 10)) {
-      inputs.push({ name: file.name, content: await file.text() });
+  const handleFiles = async (fileList: File[]) => {
+    if (fileList.length === 0) return;
+    try {
+      const inputs = await intakeFiles(fileList);
+      if (inputs.length === 0) {
+        toast.error(
+          "No scannable source files found. Supported: code files, folders, .zip archives (max 40 files).",
+        );
+        return;
+      }
+      setUploaded((prev) => [...prev, ...inputs].slice(0, 40));
+      toast.success(`${inputs.length} file${inputs.length === 1 ? "" : "s"} queued for attack simulation`);
+    } catch {
+      toast.error("Could not read those files. Try again or paste the code directly.");
     }
-    setUploaded((prev) => [...prev, ...inputs].slice(0, 10));
-    toast.success(`${inputs.length} file${inputs.length === 1 ? "" : "s"} queued for attack simulation`);
   };
+
+  const handleFetchRepo = async () => {
+    const target = parseGithubTarget(repoUrl);
+    if (!target) {
+      toast.error("Enter a GitHub URL or owner/repo (public repos only)." );
+      return;
+    }
+    setRepoLoading(true);
+    try {
+      const inputs = await fetchGithubRepo(target);
+      setUploaded((prev) => [...prev, ...inputs].slice(0, 40));
+      toast.success(
+        `Fetched ${target.owner}/${target.repo} — ${inputs.length} files queued`,
+      );
+      setRepoUrl("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Repo fetch failed");
+    } finally {
+      setRepoLoading(false);
+    }
+  };
+
+  const queuedCount = uploaded.length + (codeText.trim() ? 1 : 0);
+  const canRun = queuedCount > 0 && !running;
 
   const handleRun = () => {
     const inputs: ScanInput[] = [];
