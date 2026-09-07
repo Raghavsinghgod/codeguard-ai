@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { SimulationLab } from "@/components/SimulationLab";
+import { ComplianceView } from "@/components/ComplianceView";
+import { cweFor } from "@/lib/compliance";
 import type { ScanResult, Severity, Finding } from "@/lib/scanner";
 import {
   cvssFor,
@@ -138,6 +140,7 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
             <div>
               <p className="mb-1.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
                 Detected code · {finding.owasp}
+                {cweFor(finding.ruleId) ? ` · ${cweFor(finding.ruleId)!.id}` : ""}
               </p>
               <pre className="overflow-x-auto rounded-lg border border-border/60 bg-secondary/60 p-3 font-mono text-xs leading-5">
                 {finding.snippet}
@@ -270,6 +273,14 @@ export function ScanReport({ data }: { data: ScanReportData }) {
           </div>
         </CardContent>
       </Card>
+
+      <div>
+        <div className="mb-4 flex items-center gap-3">
+          <h3 className="text-lg font-semibold tracking-tight">OWASP & CWE compliance</h3>
+          <Separator className="flex-1" />
+        </div>
+        <ComplianceView result={result} />
+      </div>
 
       <div>
         <div className="mb-4 flex items-center gap-3">

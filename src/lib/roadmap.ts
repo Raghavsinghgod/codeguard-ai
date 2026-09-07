@@ -42,8 +42,8 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       p(6, "Secrets & credentials scanner", "Entropy analysis plus provider-specific patterns for API keys, tokens, and private keys, with git-history awareness.", "shipped"),
       p(7, "Dependency & supply-chain audit", "Vulnerable package versions, known CVE mapping, transitive risk, and lockfile analysis.", "shipped"),
       p(8, "AI deep analysis", "LLM review via the built-in AI gateway: contextual reasoning over findings, business-logic flaws, and plain-English exploitation narrative.", "shipped"),
-      p(9, "OWASP Top 10 & CWE mapping", "Compliance view with coverage scores, standards mapping, and audit-ready summaries.", "up-next"),
-      p(10, "Hardening recommendations", "Auto-generated fixes with patch snippets, before/after code, and per-finding fix difficulty.", "planned"),
+      p(9, "OWASP Top 10 & CWE mapping", "Compliance view with coverage scores, standards mapping, and audit-ready summaries.", "shipped"),
+      p(10, "Hardening recommendations", "Auto-generated fixes with patch snippets, before/after code, and per-finding fix difficulty.", "up-next"),
     ],
   },
   {
