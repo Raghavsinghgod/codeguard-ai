@@ -34,6 +34,43 @@ const schema = defineSchema(
 
     // add other tables here
 
+    // Security scan results produced by the CrackScope attack-simulation engine.
+    scans: defineTable({
+      userId: v.id("users"),
+      name: v.string(),
+      createdAt: v.number(),
+      score: v.number(), // 0-100 security score
+      grade: v.string(), // A-F
+      filesScanned: v.number(),
+      linesScanned: v.number(),
+      critical: v.number(),
+      high: v.number(),
+      medium: v.number(),
+      low: v.number(),
+      info: v.number(),
+      findings: v.array(
+        v.object({
+          ruleId: v.string(),
+          title: v.string(),
+          severity: v.union(
+            v.literal("critical"),
+            v.literal("high"),
+            v.literal("medium"),
+            v.literal("low"),
+            v.literal("info"),
+          ),
+          category: v.string(),
+          owasp: v.string(),
+          file: v.string(),
+          line: v.number(),
+          snippet: v.string(),
+          description: v.string(),
+          remediation: v.string(),
+          payload: v.string(),
+        }),
+      ),
+    }).index("by_user", ["userId"]),
+
     // tableName: defineTable({
     //   ...
     //   // table fields
