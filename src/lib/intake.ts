@@ -3,6 +3,7 @@
 // GitHub repos) into the ScanInput[] the scanner engine consumes.
 import { unzipSync, strFromU8 } from "fflate";
 import type { ScanInput } from "@/lib/scanner";
+import { isDependencyManifest } from "@/lib/deps";
 
 export const MAX_FILES = 40;
 export const MAX_FILE_BYTES = 200 * 1024; // 200 KB per source file
@@ -25,7 +26,7 @@ export function extOf(name: string): string {
 
 export function isScannableFile(name: string, size?: number): boolean {
   if (size !== undefined && size > MAX_FILE_BYTES) return false;
-  if (!SCANNABLE_EXT.has(extOf(name))) return false;
+  if (!SCANNABLE_EXT.has(extOf(name)) && !isDependencyManifest(name)) return false;
   if (name.includes(".min.")) return false;
   const lower = `/${name.replace(/\\/g, "/").toLowerCase()}`;
   return !SKIP_DIR_PARTS.some((p) => lower.includes(p));

@@ -62,6 +62,24 @@ app.get("/verify", (req, res) => {
 document.getElementById("out").innerHTML = req.query.q;
 `;
 
+// Intentionally vulnerable manifest — exercises the Part 7 dependency audit
+// (known CVEs, unpinned dep, install-script pattern).
+const SAMPLE_MANIFEST = `{
+  "name": "vulnerable-demo",
+  "version": "1.0.0",
+  "scripts": {
+    "setup": "curl -s https://downloads.example.com/install.sh | bash",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "4.16.0",
+    "lodash": "4.17.15",
+    "jsonwebtoken": "^8.5.0",
+    "axios": "0.20.0",
+    "json-utils": "*"
+  }
+}`;
+
 const toScanResult = (row: {
   name: string;
   score: number;
@@ -312,6 +330,11 @@ export default function Dashboard() {
                           setScanName((n) => n || "vulnerable-demo");
                           setFileName(SAMPLE_NAME);
                           setCodeText(SAMPLE_CODE);
+                          setUploaded((prev) =>
+                            prev.some((f) => f.name === "package.json")
+                              ? prev
+                              : [...prev, { name: "package.json", content: SAMPLE_MANIFEST }].slice(0, 40),
+                          );
                         }}
                       >
                         <FlaskConical className="size-3.5" /> Load vulnerable demo

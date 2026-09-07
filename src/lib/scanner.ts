@@ -6,6 +6,7 @@
 // analysis) will layer on top of this API.
 import { computeTaint, isLineTainted } from "@/lib/taint";
 import { detectSecrets } from "@/lib/secrets";
+import { auditDependencies } from "@/lib/deps";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -424,6 +425,10 @@ export function scan(inputs: ScanInput[]): ScanResult {
     // Part 6: dedicated secrets pass (provider patterns + entropy),
     // skipping lines the rule pass already reported.
     findings.push(...detectSecrets(input, reportedLines));
+
+    // Part 7: dependency & supply-chain audit pass for manifest/lockfiles
+    // (package.json, package-lock.json, requirements.txt).
+    findings.push(...auditDependencies(input));
   }
 
   findings.sort((a, b) => {
