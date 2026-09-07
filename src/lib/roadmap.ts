@@ -31,8 +31,8 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       p(1, "Platform foundation", "Auth, database schema, projects, dashboard, and the first end-to-end attack simulation with a heuristic engine and pentest-style report.", "shipped"),
       p(2, "Code intake", "Multi-file paste, drag-and-drop upload, folder zips, and GitHub repo/URL ingestion with language auto-detection.", "shipped"),
       p(3, "Static analysis engine v1", "AST-aware detectors per language, taint tracking from sources to sinks, and dramatically fewer false positives.", "shipped"),
-      p(4, "Attack simulation lab v1", "Per-finding exploit generation: live payload crafting, exploit chains, and a sandboxed 'try to crack' replay view.", "up-next"),
-      p(5, "Pentest report generator", "Executive summary, CVSS-style scoring, methodology section, and export to Markdown/PDF.", "planned"),
+      p(4, "Attack simulation lab v1", "Per-finding exploit generation: live payload crafting, exploit chains, and a sandboxed 'try to crack' replay view.", "shipped"),
+      p(5, "Pentest report generator", "Executive summary, CVSS-style scoring, methodology section, and export to Markdown/PDF.", "up-next"),
     ],
   },
   {

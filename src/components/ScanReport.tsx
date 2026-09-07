@@ -9,7 +9,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { SimulationLab } from "@/components/SimulationLab";
 import type { ScanResult, Severity, Finding } from "@/lib/scanner";
 import { buildMarkdownReport } from "@/lib/scanner";
 
@@ -85,6 +93,7 @@ function ScoreRing({ score, grade }: { score: number; grade: string }) {
 
 function FindingCard({ finding, index }: { finding: Finding; index: number }) {
   const [open, setOpen] = useState(index < 3);
+  const [labOpen, setLabOpen] = useState(false);
   const style = SEVERITY_STYLE[finding.severity];
   return (
     <motion.div
@@ -137,9 +146,28 @@ function FindingCard({ finding, index }: { finding: Finding; index: number }) {
               </p>
               <p className="text-sm leading-6 text-foreground/90">{finding.remediation}</p>
             </div>
+            <div className="flex justify-end">
+              <Button size="sm" className="gap-2 rounded-full scan-glow" onClick={() => setLabOpen(true)}>
+                <Swords className="size-4" /> Try to crack
+              </Button>
+            </div>
           </div>
         )}
       </Card>
+      <Dialog open={labOpen} onOpenChange={setLabOpen}>
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Swords className="size-4 text-primary" /> Attack simulation lab
+            </DialogTitle>
+            <DialogDescription>
+              Step through the exploit chain for this finding in a sandbox. Everything below is a
+              local simulation — no requests are sent anywhere.
+            </DialogDescription>
+          </DialogHeader>
+          <SimulationLab finding={finding} />
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
