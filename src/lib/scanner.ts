@@ -5,6 +5,7 @@
 // Pure TypeScript so it runs instantly client-side; Part 8 (AI deep
 // analysis) will layer on top of this API.
 import { computeTaint, isLineTainted } from "@/lib/taint";
+import { detectSecrets } from "@/lib/secrets";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -169,20 +170,8 @@ const RULES: Rule[] = [
     maxMatchesPerFile: 8,
     safeHints: ["process.env", "os.environ", "import.meta.env", "placeholder", "example", "your-", "xxx"],
   },
-  {
-    id: "SEC-002",
-    title: "Cloud provider key pattern detected",
-    severity: "critical",
-    category: "Sensitive Data Exposure",
-    owasp: "A02:2021 – Cryptographic Failures",
-    description:
-      "The text matches the structure of a well-known cloud credential (AWS access key, Google API key, Slack token, private key block). Structured keys are trivially discoverable and automated scanners index them within hours of exposure.",
-    remediation:
-      "Revoke and rotate the credential now, purge it from history (e.g. git filter-repo), and load it from a secret manager at runtime.",
-    payload: `Bot action: regex sweep of public repo / paste site\nEffect: key found, resources provisioned on the victim's account within minutes.`,
-    pattern: /AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[baprs]-[0-9A-Za-z-]{10,}|-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/,
-    maxMatchesPerFile: 5,
-  },
+  // SEC-002 (cloud key patterns) superseded in Part 6 by the dedicated
+  // secrets & credentials scanner in lib/secrets.ts (entropy + providers).
   {
     id: "CRYPTO-001",
     title: "Weak hash algorithm (MD5/SHA1) for security purposes",
@@ -402,6 +391,7 @@ export function scan(inputs: ScanInput[]): ScanResult {
     const lines = input.content.split("\n");
     linesScanned += lines.length;
     const taint = computeTaint(lines);
+    const reportedLines = new Set<number>();
 
     for (const rule of RULES) {
       let matches = 0;
@@ -414,6 +404,7 @@ export function scan(inputs: ScanInput[]): ScanResult {
         if (!m) continue;
         if (rule.taintRequired && !isLineTainted(line, taint)) continue;
         matches++;
+        reportedLines.add(i + 1);
         findings.push({
           ruleId: rule.id,
           title: rule.title,
@@ -429,6 +420,10 @@ export function scan(inputs: ScanInput[]): ScanResult {
         });
       }
     }
+
+    // Part 6: dedicated secrets pass (provider patterns + entropy),
+    // skipping lines the rule pass already reported.
+    findings.push(...detectSecrets(input, reportedLines));
   }
 
   findings.sort((a, b) => {
