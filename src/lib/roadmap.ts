@@ -54,14 +54,14 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       p(12, "Scan history & diffing", "Compare scans over time, detect regressions, and track remediation velocity.", "shipped"),
       p(13, "Fuzzing module", "Simulated input fuzzing of user-controlled flows with mutation strategies and crash-pattern heuristics.", "shipped"),
       p(14, "Auth & session attacks", "JWT flaws, session fixation, IDOR hunting, and privilege-escalation patterns.", "shipped"),
-      p(15, "Crypto misuse detector", "Weak hashes, hardcoded IVs, ECB mode, insecure randomness, and certificate pitfalls.", "up-next"),
+      p(15, "Crypto misuse detector", "Weak hashes, hardcoded IVs, ECB mode, insecure randomness, and certificate pitfalls.", "shipped"),
     ],
   },
   {
     phase: 4,
     name: "Product depth",
     parts: [
-      p(16, "Injection deep-scan", "SQL/NoSQL/LDAP/template/ORM variants with database-engine-aware payload selection.", "planned"),
+      p(16, "Injection deep-scan", "SQL/NoSQL/LDAP/template/ORM variants with database-engine-aware payload selection.", "up-next"),
       p(17, "Network surface mapper", "Endpoint discovery, CORS analysis, SSRF surface, and open-redirect graphing.", "planned"),
       p(18, "CI/CD & pipeline guardrails", "GitHub Actions, Dockerfile, and Terraform/IaC scanning with pipeline-blocking severity gates.", "planned"),
       p(19, "Team workspaces", "Multi-member projects, roles, shared reports, and activity feeds.", "planned"),

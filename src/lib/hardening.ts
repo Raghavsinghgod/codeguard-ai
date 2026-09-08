@@ -529,6 +529,120 @@ const GUIDES: Record<string, HardeningGuide> = {
     after: "const ok = await bcrypt.compare(req.body.password, user.passwordHash);\nif (ok) { login(); }",
     verify: "Re-scan; timing across candidate bytes no longer correlates with correctness.",
   },
+  // Crypto misuse pass (Part 15)
+  "CIV-001": {
+    difficulty: "easy",
+    effort: "~20 min",
+    steps: [
+      "Generate a fresh random IV per encryption call.",
+      "Prepend the IV to the ciphertext (IVs are public but must never repeat).",
+    ],
+    before: 'const IV = Buffer.from("0123456789abcdef");\ncipher = crypto.createCipheriv("aes-256-cbc", key, IV);',
+    after: "const iv = crypto.randomBytes(16);\nconst out = Buffer.concat([iv, encrypted]); // store iv with ciphertext",
+    verify: "Re-scan; encrypt the same plaintext twice — ciphertexts must differ.",
+  },
+  "CIV-002": {
+    difficulty: "moderate",
+    effort: "~1–2 h (data migration)",
+    steps: [
+      "Switch the mode string to aes-256-gcm.",
+      "Store and verify the authTag on every ciphertext.",
+      "Re-encrypt existing data during a migration window.",
+    ],
+    before: 'crypto.createCipheriv("aes-256-ecb", key, null);',
+    after: 'const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);\nconst tag = cipher.getAuthTag(); // store with ciphertext',
+    verify: "Re-scan; ECB mode no longer appears anywhere in the codebase.",
+  },
+  "CIV-003": {
+    difficulty: "easy",
+    effort: "~30 min",
+    steps: [
+      "Replace the fixed nonce with crypto.randomBytes(12) per message (GCM).",
+      "If using counters, persist and increment them per key; never reset.",
+    ],
+    before: 'const nonce = Buffer.from("00112233445566778899aabb");',
+    after: "const nonce = crypto.randomBytes(12); // unique per message, stored with ciphertext",
+    verify: "Re-scan; no literal nonce bytes remain in cipher construction.",
+  },
+  "CKEY-001": {
+    difficulty: "involved",
+    effort: "~1 day (key rotation)",
+    steps: [
+      "Raise RSA modulus to 3072+ or move to ECC P-256/Ed25519.",
+      "Use AES-256 keys for symmetric encryption.",
+      "Rotate undersized keys and re-encrypt stored data.",
+    ],
+    before: "generateKeyPairSync('rsa', { modulusLength: 1024 })",
+    after: "generateKeyPairSync('rsa', { modulusLength: 3072 })",
+    verify: "Re-scan; no sub-2048-bit RSA or sub-128-bit AES keys remain.",
+  },
+  "CKEY-002": {
+    difficulty: "moderate",
+    effort: "~2–4 h",
+    steps: [
+      "Migrate to AES-GCM (authenticated encryption).",
+      "If CBC must stay, add encrypt-then-MAC with HMAC-SHA256 and verify before decrypting.",
+    ],
+    before: 'const enc = crypto.createCipheriv("aes-256-cbc", key, iv).update(data);',
+    after: 'const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);\nconst enc = Buffer.concat([cipher.update(data), cipher.final()]);\nconst tag = cipher.getAuthTag(); // verify on decrypt',
+    verify: "Re-scan; tampered ciphertext must fail decryption with an auth error.",
+  },
+  "CPBK-001": {
+    difficulty: "moderate",
+    effort: "~2–4 h (hash migration)",
+    steps: [
+      "Switch password hashing to bcrypt (cost ≥ 12) or Argon2id.",
+      "Re-hash transparently on next successful login (legacy hash → new KDF).",
+      "Never log or transmit the plaintext password.",
+    ],
+    before: "crypto.createHash('sha256').update(password).digest('hex');",
+    after: "const hash = await bcrypt.hash(password, 12);",
+    verify: "Re-scan; stored hashes now carry the bcrypt/argon2 prefix ($2b$ / $argon2id$).",
+  },
+  "CPBK-002": {
+    difficulty: "trivial",
+    effort: "~10 min",
+    steps: [
+      "Raise PBKDF2 iterations to ≥ 600,000 (SHA-256) or 210,000 (SHA-512).",
+      "Consider migrating to Argon2id for better GPU resistance.",
+    ],
+    before: "crypto.pbkdf2Sync(password, salt, 10000, 32, 'sha256');",
+    after: "crypto.pbkdf2Sync(password, salt, 600000, 32, 'sha256');",
+    verify: "Re-scan; login latency stays under ~250ms with the new count.",
+  },
+  "CCERT-001": {
+    difficulty: "easy",
+    effort: "~30 min",
+    steps: [
+      "Remove the verification bypass entirely.",
+      "For internal self-signed services, provide the private CA via NODE_EXTRA_CA_CERTS or pin the SPKI hash.",
+    ],
+    before: "https.get(url, { rejectUnauthorized: false }, cb);",
+    after: "https.get(url, { ca: fs.readFileSync('internal-ca.pem') }, cb);",
+    verify: "Re-scan; MITM with a self-signed cert must fail the connection.",
+  },
+  "CRAND-001": {
+    difficulty: "trivial",
+    effort: "~10 min",
+    steps: [
+      "Replace timestamp/counter-derived randomness with crypto.randomBytes.",
+    ],
+    before: "const iv = Date.now().toString(16);",
+    after: "const iv = crypto.randomBytes(16);",
+    verify: "Re-scan; generated IVs are unpredictable across runs.",
+  },
+  "CDES-001": {
+    difficulty: "involved",
+    effort: "~1 day (data migration)",
+    steps: [
+      "Inventory all data encrypted with the legacy cipher.",
+      "Decrypt once and re-encrypt with AES-256-GCM in a migration window.",
+      "Remove the legacy cipher code path.",
+    ],
+    before: 'crypto.createCipheriv("des-ede3-cbc", key, iv);',
+    after: 'crypto.createCipheriv("aes-256-gcm", key, iv); // + authTag handling',
+    verify: "Re-scan; no DES/3DES/RC4/Blowfish references remain.",
+  },
 };
 
 // Category fallback for anything without a dedicated guide.

@@ -59,6 +59,17 @@ const RULE_CWE: Record<string, CweRef> = {
   "PRIV-002": { id: "CWE-862", name: "Missing Authorization", owasp: "A01" },
   "BRUTE-001": { id: "CWE-307", name: "Improper Restriction of Excessive Authentication Attempts", owasp: "A07" },
   "BRUTE-002": { id: "CWE-208", name: "Observable Timing Discrepancy in Password Comparison", owasp: "A07" },
+  // Crypto misuse pass (Part 15)
+  "CIV-001": { id: "CWE-329", name: "Not Using an Unpredictable IV with CBC Mode", owasp: "A02" },
+  "CIV-002": { id: "CWE-327", name: "Use of a Broken or Risky Cryptographic Algorithm (ECB)", owasp: "A02" },
+  "CIV-003": { id: "CWE-323", name: "Reusing a Nonce, Key Pair in Encryption", owasp: "A02" },
+  "CKEY-001": { id: "CWE-326", name: "Inadequate Encryption Strength", owasp: "A02" },
+  "CKEY-002": { id: "CWE-321", name: "Use of Hard-coded Cryptographic Key (malleable ciphertext)", owasp: "A02" },
+  "CPBK-001": { id: "CWE-916", name: "Use of Password Hash With Insufficient Computational Effort", owasp: "A02" },
+  "CPBK-002": { id: "CWE-916", name: "Use of Password Hash With Insufficient Computational Effort (PBKDF2 iterations)", owasp: "A02" },
+  "CCERT-001": { id: "CWE-295", name: "Improper Certificate Validation", owasp: "A02" },
+  "CRAND-001": { id: "CWE-330", name: "Use of Insufficiently Random Values", owasp: "A02" },
+  "CDES-001": { id: "CWE-327", name: "Use of a Broken or Risky Cryptographic Algorithm (legacy cipher)", owasp: "A02" },
 };
 
 /** CWE reference for a rule id; SECRET-* provider rules all map to CWE-798 / A02. */
@@ -106,6 +117,12 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
       { id: "CRYPTO-001", label: "Weak hash algorithms (MD5/SHA1)", status: "tested" },
       { id: "CRYPTO-002", label: "Insecure randomness for security tokens", status: "tested" },
       { id: "CRYPTO-003", label: "Disabled TLS/certificate verification", status: "tested" },
+      { id: "CIV-", label: "IV hygiene: hardcoded IVs, ECB mode, nonce reuse", status: "tested" },
+      { id: "CKEY-", label: "Key strength & authenticated encryption (AEAD)", status: "tested" },
+      { id: "CPBK-", label: "Password hashing strength (KDF choice & iterations)", status: "tested" },
+      { id: "CCERT-", label: "Certificate validation bypasses in TLS clients", status: "tested" },
+      { id: "CRAND-", label: "Predictable IV/salt/seed sources", status: "tested" },
+      { id: "CDES-", label: "Legacy cipher usage (DES/3DES/RC4/Blowfish)", status: "tested" },
       { id: "SECRET-", label: "Hardcoded secrets & credentials (provider + entropy)", status: "tested" },
     ],
   },

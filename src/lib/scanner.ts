@@ -9,6 +9,7 @@ import { detectSecrets } from "./secrets";
 import { auditDependencies } from "./deps";
 import { runFuzzing } from "./fuzz";
 import { detectAuthAttacks } from "./authattacks";
+import { detectCryptoMisuse } from "./cryptomisuse";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -439,6 +440,10 @@ export function scan(inputs: ScanInput[]): ScanResult {
     // Part 14: auth & session attack pass — JWT confusion, session fixation,
     // privilege escalation, brute-force surface (structure rules, no taint).
     findings.push(...detectAuthAttacks(input, reportedLines));
+
+    // Part 15: crypto misuse pass — hardcoded IVs, ECB, nonce reuse, weak
+    // keys, unauthenticated encryption, legacy ciphers (structure rules).
+    findings.push(...detectCryptoMisuse(input, reportedLines));
   }
 
   findings.sort((a, b) => {
