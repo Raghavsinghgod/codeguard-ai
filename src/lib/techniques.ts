@@ -272,7 +272,7 @@ export const TECHNIQUES: Technique[] = [
     category: "dependencies",
     severity: "high",
     owasp: "A06:2021 – Vulnerable and Outdated Components",
-    ruleIds: ["DEP-001", "DEP-002", "DEP-003", "SUPPLY-001", "SUPPLY-002", "SUPPLY-003"],
+    ruleIds: ["SUPPLY-001", "SUPPLY-002", "SUPPLY-003"],
     summary:
       "Known-vulnerable package versions (lodash prototype pollution, ejs RCE, axios SSRF…) ship to production; public exploits exist for most.",
     attackFlow: [
