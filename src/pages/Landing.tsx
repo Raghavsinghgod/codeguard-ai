@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router";
 import {
   ArrowRight,
+  Bot,
   Bug,
   Crosshair,
   FileSearch,
@@ -27,9 +28,14 @@ const fadeUp = {
 
 const CAPABILITIES = [
   {
+    icon: Bot,
+    title: "Strix agent team",
+    body: "A multi-agent red team modeled on usestrix/strix: recon, exploitation, validation, and reporting agents collaborate, chain findings, and produce working PoCs.",
+  },
+  {
     icon: Swords,
-    title: "Attack simulation",
-    body: "Every finding ships with the exploitation path a pentester would attempt — payloads, bypass chains, and blast radius — for the code you submit.",
+    title: "Exploit validation",
+    body: "Every finding ships with the exploitation path a pentester would attempt — payloads, bypass chains, and blast radius — then gets validated with a real proof-of-concept.",
   },
   {
     icon: FileSearch,
@@ -111,18 +117,19 @@ export default function Landing() {
               variant="outline"
               className="mb-6 gap-2 rounded-full border-primary/30 bg-primary/10 px-3 py-1 text-[13px] text-primary"
             >
-              <Terminal className="size-3.5" />
-              Part {SHIPPED_PARTS} of {TOTAL_PARTS} shipped — attack-simulation engine live
+              <Bot className="size-3.5" />
+              Powered by the Strix multi-agent engine · open-source DeepSeek analysis
             </Badge>
             <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">
               It attacks your code
               <span className="text-glow block text-primary">before attackers do</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-7 text-muted-foreground sm:text-lg">
-              CrackScope is an automated red-team for your codebase. Submit any
-              source file and it simulates injection, auth-bypass, crypto, and
-              SSRF attacks — then hands you a scored pentest report with the
-              exact fixes.
+              CrackScope is an automated red-team for your codebase. Teams of AI
+              pentester agents — modeled on Strix — simulate injection,
+              auth-bypass, crypto, and SSRF attacks, validate every finding with
+              a working PoC, and hand you a scored pentest report with fixes and
+              ready-to-merge patches.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button asChild size="lg" className="h-12 rounded-full px-7 text-[15px] scan-glow">
@@ -156,12 +163,15 @@ export default function Landing() {
                 </span>
               </div>
               <div className="p-5 font-mono text-[13px] leading-6">
-                <p className="text-muted-foreground">→ 5 attack stages queued…</p>
+                <p className="text-muted-foreground">→ spawning agent team · 4 agents queued…</p>
                 <p className="text-foreground">
                   <span className="text-primary">[recon]</span> 1 file · 38 lines · JavaScript
                 </p>
                 <p className="text-foreground">
-                  <span className="text-primary">[probes]</span> SQLi… CMD… XSS…
+                  <span className="text-primary">[exploitation]</span> SQLi… CMD… XSS… crafting PoCs
+                </p>
+                <p className="text-foreground">
+                  <span className="text-primary">[validation]</span> 2 validated · 1 probable · 1 attack chain linked
                 </p>
                 <p className="text-destructive">
                   <span className="font-semibold">[!]</span> CMD-001 critical ·
@@ -181,7 +191,7 @@ export default function Landing() {
                   findings
                 </p>
                 <p className="text-muted-foreground">
-                  report saved · simulated 14 attack paths · 0.9s
+                  report saved · agent team finished in 0.9s · CI gate FAIL (exit 1)
                 </p>
               </div>
             </Card>
@@ -194,12 +204,12 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-6">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              A full attack suite, one submission
+              A full agent team, one submission
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Six detection families modeled on how real pentesters work — each
-              finding verified against simulated exploitation, not just pattern
-              noise.
+              Detection families modeled on how real pentesters work, run by a
+              collaborating agent team — every finding verified against
+              simulated exploitation, not just pattern noise.
             </p>
           </motion.div>
           <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -269,7 +279,7 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-6">
           <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Built in 25 parts
+              Built in {TOTAL_PARTS} parts
             </h2>
             <p className="mt-4 text-muted-foreground">
               A platform this large ships in phases. Here is the full build

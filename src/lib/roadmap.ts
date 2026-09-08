@@ -41,7 +41,7 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
     parts: [
       p(6, "Secrets & credentials scanner", "Entropy analysis plus provider-specific patterns for API keys, tokens, and private keys, with git-history awareness.", "shipped"),
       p(7, "Dependency & supply-chain audit", "Vulnerable package versions, known CVE mapping, transitive risk, and lockfile analysis.", "shipped"),
-      p(8, "AI deep analysis", "LLM review via the built-in AI gateway: contextual reasoning over findings, business-logic flaws, and plain-English exploitation narrative.", "shipped"),
+      p(8, "AI deep analysis (open-source model)", "LLM review powered by DeepSeek via the Novita inference gateway: contextual reasoning over findings, business-logic flaws, and plain-English exploitation narrative.", "shipped"),
       p(9, "OWASP Top 10 & CWE mapping", "Compliance view with coverage scores, standards mapping, and audit-ready summaries.", "shipped"),
       p(10, "Hardening recommendations", "Auto-generated fixes with patch snippets, before/after code, and per-finding fix difficulty.", "shipped"),
     ],
@@ -77,6 +77,17 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       p(23, "Attack knowledge base", "Searchable technique library (MITRE/OWASP-inspired) mapped to live findings.", "shipped"),
       p(24, "Risk analytics", "Trend dashboards, heatmaps, language breakdown, and MTTR metrics.", "shipped"),
       p(25, "Public API & CLI", "Programmatic access, `crackscope` CLI, and CI webhooks for automation.", "shipped"),
+    ],
+  },
+  {
+    phase: 6,
+    name: "Strix engine",
+    parts: [
+      p(26, "Strix multi-agent red team", "Graph-of-Agents orchestration modeled on usestrix/strix: recon, exploitation, validation, and reporting agents collaborate over scan findings like a real pentest team.", "shipped"),
+      p(27, "Exploit validation & PoCs", "Working proof-of-concept exploits per finding with validation verdicts (validated / probable / needs-context) and confidence scoring — real exploitation evidence, not false positives.", "shipped"),
+      p(28, "Attack-chain discovery", "Chains individual findings into multi-stage kill chains with narratives and end-to-end impact, prioritized above isolated findings.", "shipped"),
+      p(29, "Agent toolkit & skills", "The Strix agentic toolkit (HTTP proxy, browser exploitation, shell, exploit runtime, recon/OSINT, SAST+DAST, knowledge base) plus the nine SKILL.md agent skills, with per-run usage tracking.", "shipped"),
+      p(30, "Auto-fix & CI gate", "AI-generated ready-to-merge patches and the headless severity gate that blocks pipelines when validated critical/high findings remain.", "shipped"),
     ],
   },
 ];

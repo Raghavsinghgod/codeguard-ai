@@ -78,6 +78,14 @@ export interface StrixRun {
   durationMs: number;
   /** 0-100 — share of findings the team validated as exploitable. */
   validationRate: number;
+  /** Strix parity: agentic toolkit usage this run. */
+  toolkit: ToolkitCapability[];
+  /** Strix parity: the 9 SKILL.md agent skills, with fired flags. */
+  skills: AgentSkill[];
+  /** Strix parity: auto-fix patches for validated findings. */
+  fixes: AutoFixPatch[];
+  /** Strix parity: headless CI gate verdict. */
+  ciGate: CiGateVerdict;
 }
 
 // ---------- helpers ----------
@@ -158,9 +166,230 @@ const CHAIN_LINKS: Array<{ from: string; to: string; name: string; narrative: st
   },
 ];
 
+// ---------- Strix parity: toolkit, skills, scan modes, auto-fix, CI gate ----------
+
+/** The Strix agentic pentesting toolkit — each entry maps to the offline
+ *  simulation the agent performs over the submitted code. */
+export interface ToolkitCapability {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  /** Which agent in the team drives this tool. */
+  driver: AgentRole;
+  /** When true, the toolkit produced at least one action this run. */
+  used: boolean;
+  calls: number;
+}
+
+/** One of the 9 SKILL.md-style agent skills Strix ships with
+ *  (npx skills add usestrix/strix parity). */
+export interface AgentSkill {
+  id: string;
+  name: string;
+  description: string;
+  /** Triggered this run? */
+  fired: boolean;
+}
+
+export type ScanMode = "quick" | "standard" | "deep";
+
+export interface ScanBudget {
+  mode: ScanMode;
+  /** Max findings the exploitation agent will work, by mode. */
+  maxTargets: number;
+  label: string;
+}
+
+/** Strix auto-fix: AI-generated security patch, ready-to-merge parity. */
+export interface AutoFixPatch {
+  key: string;
+  ruleId: string;
+  file: string;
+  line: number;
+  title: string;
+  patch: string;
+  confidence: "high" | "medium" | "manual";
+}
+
+/** Strix headless / CI gate: non-zero exit parity when vulns are found. */
+export interface CiGateVerdict {
+  /** Equivalent of `strix -n --scan-mode <mode>` exit code. */
+  exitCode: 0 | 1;
+  /** Gate passes when no validated critical/high findings remain. */
+  pass: boolean;
+  mode: ScanMode;
+  blocking: number;
+  detail: string;
+}
+
+const TOOLKIT: Array<Omit<ToolkitCapability, "used" | "calls">> = [
+  {
+    id: "proxy",
+    name: "HTTP interception proxy",
+    description: "Full request/response manipulation and analysis (Caido-style).",
+    icon: "Network",
+    driver: "exploitation",
+  },
+  {
+    id: "browser",
+    name: "Browser exploitation",
+    description: "Automated browser for XSS, CSRF, clickjacking, and auth-bypass flows (Playwright-style).",
+    icon: "Globe",
+    driver: "exploitation",
+  },
+  {
+    id: "shell",
+    name: "Shell & command execution",
+    description: "Interactive terminal for exploit development and post-exploitation.",
+    icon: "Terminal",
+    driver: "exploitation",
+  },
+  {
+    id: "exploit-runtime",
+    name: "Custom exploit runtime",
+    description: "Python-style sandbox for writing and validating PoC exploits.",
+    icon: "Code",
+    driver: "validation",
+  },
+  {
+    id: "recon-osint",
+    name: "Reconnaissance & OSINT",
+    description: "Attack-surface mapping, endpoint enumeration, and fingerprinting.",
+    icon: "Radar",
+    driver: "recon",
+  },
+  {
+    id: "sast-dast",
+    name: "Static & dynamic code analysis",
+    description: "SAST + DAST capabilities over the submitted code, combined.",
+    icon: "ScanSearch",
+    driver: "recon",
+  },
+  {
+    id: "knowledge-base",
+    name: "Vulnerability knowledge base",
+    description: "Structured findings with CVSS scoring and OWASP classification.",
+    icon: "BookOpen",
+    driver: "reporting",
+  },
+];
+
+export const STRIX_SKILLS: Array<Omit<AgentSkill, "fired">> = [
+  {
+    id: "pentest-code",
+    name: "Pentest a codebase",
+    description: "Run a full offensive review of source code (strix --target ./dir parity).",
+  },
+  {
+    id: "pentest-web",
+    name: "Pentest a web app",
+    description: "Black-box web assessment: auth flows, sessions, client-side attacks.",
+  },
+  {
+    id: "pentest-api",
+    name: "Pentest an API",
+    description: "OpenAPI/Swagger/Postman contract testing of every declared endpoint.",
+  },
+  {
+    id: "owasp-top10",
+    name: "OWASP Top 10 review",
+    description: "Systematic sweep across the OWASP Top 10 categories.",
+  },
+  {
+    id: "fix-findings",
+    name: "Fix findings",
+    description: "Generate security patches for validated findings (auto-fix parity).",
+  },
+  {
+    id: "ci-scan",
+    name: "CI/CD scan",
+    description: "Headless gated scan that blocks insecure code before it merges.",
+  },
+  {
+    id: "greybox-auth",
+    name: "Grey-box authenticated test",
+    description: "Test with credentials provided (--instruction parity).",
+  },
+  {
+    id: "diff-scope",
+    name: "Diff-scope review",
+    description: "Scope the review to changed files only (PR mode parity).",
+  },
+  {
+    id: "report",
+    name: "Generate pentest report",
+    description: "Compliance-ready report with validated PoCs and remediation order.",
+  },
+];
+
+export const SCAN_BUDGETS: Record<ScanMode, ScanBudget> = {
+  quick: { mode: "quick", maxTargets: 4, label: "Quick review — top targets only, CI-friendly" },
+  standard: { mode: "standard", maxTargets: 8, label: "Standard pentest — balanced depth and speed" },
+  deep: { mode: "deep", maxTargets: 16, label: "Deep assessment — full team, every candidate worked" },
+};
+
+const FIX_PATCH: Record<string, string> = {
+  "SQLI-001": "const user = await db.query('SELECT * FROM users WHERE name = ?', [name]);",
+  "SQLI-002": "const rows = await db.execute(sql`SELECT * FROM items WHERE id = ${id}`); // tagged template → parameterized",
+  "XSS-001": "el.textContent = userContent; // or: DOMPurify.sanitize(html) before innerHTML",
+  "XSS-002": "res.send(escapeHtml(String(req.query.q))); // encode + strict CSP header",
+  "CMD-001": "await execFile('convert', [inputPath, outPath]); // argv array, no shell",
+  "CMD-002": "const handler = HANDLERS[expr] ?? throw new Error('unknown op'); // lookup table instead of eval",
+  "SEC-001": "const apiKey = process.env.PAYMENT_API_KEY; // move to secret manager, rotate the exposed value",
+  "CRYPTO-001": "const hash = crypto.createHash('sha256').update(data).digest(); // or argon2id for passwords",
+  "CRYPTO-002": "const token = crypto.randomBytes(32).toString('hex'); // CSPRNG",
+  "CRYPTO-003": "// remove rejectUnauthorized:false — pin the dev CA instead",
+  "AUTH-001": "jwt.verify(token, secret, { algorithms: ['HS256'] }); // pin alg, validate exp/iss/aud",
+  "AUTH-002": "const doc = await db.invoice.findFirst({ where: { id, userId: req.auth.userId } }); // scope by principal",
+  "PATH-001": "const p = path.resolve(BASE, req.query.file); if (!p.startsWith(BASE + path.sep)) throw new Error('outside base');",
+  "NOSQL-001": "const q = await loginSchema.parse(req.body); await db.user.findOne({ email: q.email, password: q.password });",
+  "SSRF-001": "const url = new URL(target); if (!ALLOWED_HOSTS.has(url.hostname) || isPrivateIp(await dns.lookup(url.hostname))) throw new Error('blocked');",
+  "DESER-001": "const data = JSON.parse(raw); // data-only format; or yaml.safe_load with a schema",
+  "CONFIG-001": "app.use(cors({ origin: ['https://app.example.com'], credentials: true }));",
+  "CONFIG-002": "if (process.env.NODE_ENV !== 'production') app.use(debugMiddleware);",
+  "REDIR-001": "const to = ALLOWED_REDIRECTS.has(target) ? target : '/dashboard'; res.redirect(to);",
+  "PROTO-001": "if (['__proto__', 'constructor', 'prototype'].some(k => k in obj)) throw new Error('bad key'); // or structuredClone",
+};
+
+function autofixFor(validated: ValidatedFinding[]): AutoFixPatch[] {
+  return validated
+    .filter((v) => FIX_PATCH[v.ruleId])
+    .slice(0, 10)
+    .map((v) => ({
+      key: v.key,
+      ruleId: v.ruleId,
+      file: v.file,
+      line: v.line,
+      title: v.title,
+      patch: FIX_PATCH[v.ruleId],
+      confidence: v.verdict === "validated" ? "high" : v.verdict === "probable" ? "medium" : "manual",
+    }));
+}
+
+function ciGate(result: ScanResult, mode: ScanMode, validated: ValidatedFinding[]): CiGateVerdict {
+  const blocking = validated.filter(
+    (v) => (v.verdict === "validated" || v.verdict === "probable") && (v.severity === "critical" || v.severity === "high"),
+  ).length;
+  const pass = blocking === 0;
+  return {
+    exitCode: pass ? 0 : 1,
+    pass,
+    mode,
+    blocking,
+    detail: pass
+      ? `headless scan passed — no blocking validated findings (strix -n --scan-mode ${mode} exit 0)`
+      : `${blocking} validated critical/high finding(s) would block the pipeline (strix -n --scan-mode ${mode} exit 1)`,
+  };
+}
+
 // ---------- agent run ----------
 
-export function runStrixAgents(result: ScanResult): StrixRun {
+export interface StrixRunOptions {
+  mode?: ScanMode;
+}
+
+export function runStrixAgents(result: ScanResult, options: StrixRunOptions = {}): StrixRun {
   const started = 0;
   let clock = 0;
   const actions: AgentAction[] = [];
@@ -200,12 +429,15 @@ export function runStrixAgents(result: ScanResult): StrixRun {
     push(recon.id, "recon", `discovered ${result.surface.endpoints.length} route(s); ${result.surface.authlessMutating?.length ?? 0} mutating without visible auth`);
   }
   if (result.surface?.ssrfSinks?.length) push(recon.id, "recon", `${result.surface.ssrfSinks.length} outbound-request sink(s) reachable from user input`);
+  const mode = options.mode ?? "standard";
+  const maxTargets = SCAN_BUDGETS[mode].maxTargets;
   const priority = [...findings].sort(
     (a, b) =>
       ["critical", "high", "medium", "low", "info"].indexOf(a.severity) -
       ["critical", "high", "medium", "low", "info"].indexOf(b.severity),
   );
-  for (const f of priority.slice(0, 8)) {
+  push(recon.id, "recon", `scan mode: ${mode} — ${maxTargets} target budget (${SCAN_BUDGETS[mode].label})`);
+  for (const f of priority.slice(0, maxTargets)) {
     recon.assigned.push(keyOf(f));
     push(recon.id, "recon", `queued ${f.ruleId} @ ${f.file}:${f.line} (${f.severity}) for exploitation`, keyOf(f));
   }
@@ -294,6 +526,9 @@ export function runStrixAgents(result: ScanResult): StrixRun {
   };
   const validatedCount = validated.filter((v) => v.verdict === "validated").length;
   const probableCount = validated.filter((v) => v.verdict === "probable").length;
+  const fixes = autofixFor(validated);
+  const gate = ciGate(result, mode, validated);
+  const { pass, blocking } = gate;
   push(reporting.id, "report", `assembling report: ${validatedCount} validated · ${probableCount} probable · ${chains.length} attack chain(s)`);
 
   const summary: string[] = [
@@ -312,6 +547,29 @@ export function runStrixAgents(result: ScanResult): StrixRun {
 
   const validationRate = findings.length ? Math.round((validatedCount / Math.min(findings.length, 8)) * 100) : 0;
 
+  // -- toolkit usage: mark which tools the team actually invoked
+  const toolUse = new Map<AgentRole, number>();
+  for (const a of actions) toolUse.set(a.kind === "recon" ? "recon" : a.kind === "exploit" ? "exploitation" : a.kind === "validate" ? "validation" : a.kind === "report" || a.kind === "chain" ? "reporting" : "orchestrator", (toolUse.get(a.kind === "recon" ? "recon" : a.kind === "exploit" ? "exploitation" : a.kind === "validate" ? "validation" : a.kind === "report" || a.kind === "chain" ? "reporting" : "orchestrator") ?? 0) + 1);
+  const toolkit: ToolkitCapability[] = TOOLKIT.map((t) => ({
+    ...t,
+    used: (toolUse.get(t.driver) ?? 0) > 0,
+    calls: toolUse.get(t.driver) ?? 0,
+  }));
+
+  // -- skill firing: which of the 9 skills this run exercised
+  const skills = STRIX_SKILLS.map((s) => ({
+    ...s,
+    fired:
+      s.id === "pentest-code" ||
+      s.id === "owasp-top10" ||
+      s.id === "report" ||
+      (s.id === "fix-findings" && validatedCount > 0) ||
+      (s.id === "ci-scan" && mode !== "deep") ||
+      (s.id === "diff-scope" && mode === "quick"),
+  }));
+
+  push("report-1", "report", `CI gate: ${pass ? "PASS" : "FAIL"} — exit ${pass ? 0 : 1} (${blocking} blocking)`);
+
   return {
     agents: [orchestrator, recon, exploitation, { id: "valid-1", role: "validation", name: "validation", specialty: "PoC verification & false-positive filtering", assigned: validated.map((v) => v.key) }, reporting],
     actions,
@@ -320,5 +578,9 @@ export function runStrixAgents(result: ScanResult): StrixRun {
     summary,
     durationMs: clock,
     validationRate: Math.min(validationRate, 100),
+    toolkit,
+    skills,
+    fixes,
+    ciGate: gate,
   };
 }

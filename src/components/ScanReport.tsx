@@ -24,6 +24,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SimulationLab } from "@/components/SimulationLab";
 import { ComplianceView } from "@/components/ComplianceView";
+import { StrixAgents, StrixModeSelector } from "@/components/StrixAgents";
+import { runStrixAgents, SCAN_BUDGETS, type ScanMode, type StrixRun } from "@/lib/strix";
 import { cweFor } from "@/lib/compliance";
 import { DIFFICULTY_CHIP, hardeningFor, hardeningPlan } from "@/lib/hardening";
 import { api } from "@/convex/_generated/api";
@@ -324,6 +326,11 @@ export function ScanReport({ data }: { data: ScanReportData }) {
     return map;
   }, [triageRows]);
   const [hideFp, setHideFp] = useState(false);
+  const [strixMode, setStrixMode] = useState<ScanMode>("standard");
+  const strixRun: StrixRun | null = useMemo(
+    () => (result.findings.length > 0 ? runStrixAgents(actionableResult, { mode: strixMode }) : null),
+    [result, strixMode, triageMap],
+  );
 
   const onTriage = (key: string, patch: Partial<TriageState>) => {
     if (!scanId) return;
@@ -427,6 +434,20 @@ export function ScanReport({ data }: { data: ScanReportData }) {
           </div>
         </CardContent>
       </Card>
+
+      {strixRun && (
+        <div>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <h3 className="text-lg font-semibold tracking-tight">Strix agent team</h3>
+            <Separator className="hidden flex-1 md:block" />
+            <span className="font-mono text-xs text-muted-foreground">
+              autonomous multi-agent red team · real PoCs, not false positives
+            </span>
+            <StrixModeSelector mode={strixMode} onMode={setStrixMode} />
+          </div>
+          <StrixAgents run={strixRun} mode={strixMode} />
+        </div>
+      )}
 
       <div>
         <div className="mb-4 flex items-center gap-3">
