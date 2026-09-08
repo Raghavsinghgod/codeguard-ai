@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
-import { Crosshair, FlaskConical, FolderOpen, GitCompareArrows, Github, History, ListChecks, Loader2, LogOut, Minus, Play, Radar, Trash2, TrendingDown, TrendingUp, Upload } from "lucide-react";
+import { Crosshair, FlaskConical, FolderOpen, GitCompareArrows, Github, History, ListChecks, Loader2, LogOut, Minus, Play, Radar, Trash2, TrendingDown, TrendingUp, Upload, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { AiAnalysis } from "@/components/AiAnalysis";
 import { DiffView } from "@/components/DiffView";
 import { diffScanResults, velocityStats } from "@/lib/diff";
 import { RoadmapView } from "@/components/RoadmapView";
+import { TeamTab } from "@/components/TeamTab";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -305,6 +306,9 @@ export default function Dashboard() {
               </TabsTrigger>
               <TabsTrigger value="roadmap" className="gap-2 rounded-full">
                 <ListChecks className="size-4" /> Roadmap
+              </TabsTrigger>
+              <TabsTrigger value="team" className="gap-2 rounded-full">
+                <Users className="size-4" /> Team
               </TabsTrigger>
             </TabsList>
           </div>
@@ -725,6 +729,11 @@ export default function Dashboard() {
           {/* Roadmap */}
           <TabsContent value="roadmap">
             <RoadmapView />
+          </TabsContent>
+
+          {/* Team workspaces (Part 19) */}
+          <TabsContent value="team">
+            <TeamTab />
           </TabsContent>
         </Tabs>
       </main>

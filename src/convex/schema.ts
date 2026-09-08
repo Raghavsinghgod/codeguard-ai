@@ -94,6 +94,61 @@ const schema = defineSchema(
     //   ...
     //   // table fields
     // }).index("by_field", ["field"])
+
+    // Part 19: team workspaces. A workspace groups users; members carry a
+    // per-workspace role. Scans can be shared into a workspace so the whole
+    // team sees reports and triage state.
+    workspaces: defineTable({
+      name: v.string(),
+      ownerId: v.id("users"),
+      createdAt: v.number(),
+    }).index("by_owner", ["ownerId"]),
+
+    workspaceMembers: defineTable({
+      workspaceId: v.id("workspaces"),
+      userId: v.id("users"),
+      // owner: full control (delete workspace, remove members, change roles)
+      // admin: share scans, remove members, change roles below admin
+      // member: view shared scans and triage
+      role: v.union(v.literal("owner"), v.literal("admin"), v.literal("member")),
+      joinedAt: v.number(),
+    })
+      .index("by_workspace", ["workspaceId"])
+      .index("by_workspace_user", ["workspaceId", "userId"]),
+
+    workspaceInvites: defineTable({
+      workspaceId: v.id("workspaces"),
+      code: v.string(), // short join code shared out-of-band
+      createdBy: v.id("users"),
+      createdAt: v.number(),
+    })
+      .index("by_workspace", ["workspaceId"])
+      .index("by_code", ["code"]),
+
+    workspaceScans: defineTable({
+      workspaceId: v.id("workspaces"),
+      scanId: v.id("scans"),
+      sharedBy: v.id("users"),
+      sharedAt: v.number(),
+    })
+      .index("by_workspace", ["workspaceId"])
+      .index("by_scan", ["scanId"]),
+
+    workspaceActivity: defineTable({
+      workspaceId: v.id("workspaces"),
+      userId: v.id("users"),
+      kind: v.union(
+        v.literal("workspace_created"),
+        v.literal("member_joined"),
+        v.literal("member_removed"),
+        v.literal("role_changed"),
+        v.literal("scan_shared"),
+        v.literal("scan_unshared"),
+        v.literal("triage_updated"),
+      ),
+      detail: v.string(),
+      at: v.number(),
+    }).index("by_workspace_time", ["workspaceId", "at"]),
   },
   {
     schemaValidation: false,
