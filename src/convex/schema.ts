@@ -161,6 +161,48 @@ const schema = defineSchema(
       .index("by_user", ["userId"])
       .index("by_due", ["enabled", "nextSendAt"]),
 
+    // Part 21: scheduled & recurring scans. A schedule re-scans a public
+    // GitHub repo on a cadence; each run diffs against the previous run and
+    // records drift alerts (regressions / fixes / new critical findings).
+    scanSchedules: defineTable({
+      userId: v.id("users"),
+      repoUrl: v.string(), // as entered, for display
+      owner: v.string(),
+      repo: v.string(),
+      branch: v.optional(v.string()),
+      frequency: v.union(v.literal("daily"), v.literal("weekly")),
+      nextRunAt: v.number(),
+      lastRunAt: v.optional(v.number()),
+      lastStatus: v.optional(v.string()),
+      lastScanId: v.optional(v.id("scans")),
+      enabled: v.boolean(),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_due", ["enabled", "nextRunAt"]),
+
+    driftAlerts: defineTable({
+      userId: v.id("users"),
+      scheduleId: v.id("scanSchedules"),
+      scanId: v.id("scans"),
+      verdict: v.union(
+        v.literal("regressed"),
+        v.literal("improved"),
+        v.literal("unchanged"),
+        v.literal("mixed"),
+        v.literal("first_run"),
+      ),
+      scoreDelta: v.number(), // current - previous (positive = improvement)
+      added: v.number(),
+      fixed: v.number(),
+      worstAdded: v.optional(v.string()), // severity of the worst new finding
+      detail: v.string(),
+      at: v.number(),
+      seen: v.boolean(),
+    })
+      .index("by_user_time", ["userId", "at"])
+      .index("by_schedule", ["scheduleId"]),
+
     workspaceActivity: defineTable({
       workspaceId: v.id("workspaces"),
       userId: v.id("users"),
