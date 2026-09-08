@@ -32,8 +32,8 @@ export function RoadmapView() {
             <div>
               <h2 className="text-xl font-semibold tracking-tight">Build roadmap</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                CrackScope ships in 25 parts across 5 phases. {SHIPPED_PARTS} shipped,{" "}
-                {SHIPPED_PARTS === 1 ? "24 to go" : `${TOTAL_PARTS - SHIPPED_PARTS} to go`}.
+                CrackScope ships in {TOTAL_PARTS} parts across 6 phases — including the Strix agent engine. {SHIPPED_PARTS} shipped,{" "}
+                {SHIPPED_PARTS === TOTAL_PARTS ? "all done" : `${TOTAL_PARTS - SHIPPED_PARTS} to go`}.
               </p>
             </div>
             <span className="font-mono text-sm text-muted-foreground">

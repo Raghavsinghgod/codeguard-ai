@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
+  Brain,
   Crosshair,
   BookOpen,
   CalendarClock,
@@ -44,6 +45,7 @@ import { ReportCenter } from "@/components/ReportCenter";
 import { ScheduledScans } from "@/components/ScheduledScans";
 import { IntegrationsTab } from "@/components/IntegrationsTab";
 import KnowledgeBase from "@/components/KnowledgeBase";
+import ModelLab from "@/components/ModelLab";
 import Analytics from "@/components/Analytics";
 import ApiTab from "@/components/ApiTab";
 import { api } from "@/convex/_generated/api";
@@ -398,6 +400,9 @@ export default function Dashboard() {
               </TabsTrigger>
               <TabsTrigger value="api" className="gap-2 rounded-full">
                 <Terminal className="size-4" /> API
+              </TabsTrigger>
+              <TabsTrigger value="model" className="gap-2 rounded-full">
+                <Brain className="size-4" /> Model Lab
               </TabsTrigger>
               <TabsTrigger value="team" className="gap-2 rounded-full">
                 <Users className="size-4" /> Team
@@ -784,6 +789,11 @@ export default function Dashboard() {
                 </div>
               </>
             )}
+          </TabsContent>
+
+          {/* CrackScope-8B model lab */}
+          <TabsContent value="model">
+            <ModelLab />
           </TabsContent>
 
           {/* Roadmap */}
