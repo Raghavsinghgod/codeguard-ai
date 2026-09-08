@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
   Crosshair,
+  CalendarClock,
   FileOutput,
   FlaskConical,
   FolderOpen,
@@ -37,6 +38,7 @@ import { AiAnalysis } from "@/components/AiAnalysis";
 import { RoadmapView } from "@/components/RoadmapView";
 import { TeamTab } from "@/components/TeamTab";
 import { ReportCenter } from "@/components/ReportCenter";
+import { ScheduledScans } from "@/components/ScheduledScans";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
@@ -337,7 +339,7 @@ export default function Dashboard() {
             </span>
             <span className="font-semibold tracking-tight">CrackScope</span>
             <Badge variant="outline" className="rounded-full font-mono text-[10px] text-muted-foreground">
-              {20}/25 shipped
+              {21}/25 shipped
             </Badge>
           </div>
           <div className="ml-auto flex items-center gap-3">
@@ -374,6 +376,9 @@ export default function Dashboard() {
               </TabsTrigger>
               <TabsTrigger value="reports" className="gap-2 rounded-full">
                 <FileOutput className="size-4" /> Reports
+              </TabsTrigger>
+              <TabsTrigger value="scheduled" className="gap-2 rounded-full">
+                <CalendarClock className="size-4" /> Scheduled
               </TabsTrigger>
               <TabsTrigger value="team" className="gap-2 rounded-full">
                 <Users className="size-4" /> Team
@@ -770,6 +775,11 @@ export default function Dashboard() {
           {/* Report center (Part 20) */}
           <TabsContent value="reports">
             <ReportCenter />
+          </TabsContent>
+
+          {/* Scheduled & recurring scans (Part 21) */}
+          <TabsContent value="scheduled">
+            <ScheduledScans />
           </TabsContent>
 
           {/* Team workspaces (Part 19) */}

@@ -177,7 +177,7 @@ export const runDue = action({
           scoreDelta,
           added: addedCount,
           fixed: fixedCount,
-          worstAdded,
+          worstAdded: worstAdded ?? undefined,
           detail,
         });
         alerts.push({ verdict, repo: s.repoUrl, detail, at: Date.now() });
