@@ -75,7 +75,7 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       p(21, "Scheduled & recurring scans", "Background re-scans, drift alerts, and notification digests.", "shipped"),
       p(22, "Integrations", "GitHub App/webhooks, Slack and email alerts, and issue-tracker sync.", "shipped"),
       p(23, "Attack knowledge base", "Searchable technique library (MITRE/OWASP-inspired) mapped to live findings.", "shipped"),
-      p(24, "Risk analytics", "Trend dashboards, heatmaps, language breakdown, and MTTR metrics.", "planned"),
+      p(24, "Risk analytics", "Trend dashboards, heatmaps, language breakdown, and MTTR metrics.", "shipped"),
       p(25, "Public API & CLI", "Programmatic access, `crackscope` CLI, and CI webhooks for automation.", "planned"),
     ],
   },

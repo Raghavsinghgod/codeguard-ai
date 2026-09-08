@@ -43,6 +43,7 @@ import { ReportCenter } from "@/components/ReportCenter";
 import { ScheduledScans } from "@/components/ScheduledScans";
 import { IntegrationsTab } from "@/components/IntegrationsTab";
 import KnowledgeBase from "@/components/KnowledgeBase";
+import Analytics from "@/components/Analytics";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
@@ -343,7 +344,7 @@ export default function Dashboard() {
             </span>
             <span className="font-semibold tracking-tight">CrackScope</span>
             <Badge variant="outline" className="rounded-full font-mono text-[10px] text-muted-foreground">
-              {23}/25 shipped
+              {24}/25 shipped
             </Badge>
           </div>
           <div className="ml-auto flex items-center gap-3">
@@ -386,6 +387,9 @@ export default function Dashboard() {
               </TabsTrigger>
               <TabsTrigger value="integrations" className="gap-2 rounded-full">
                 <Webhook className="size-4" /> Integrations
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="gap-2 rounded-full">
+                <TrendingUp className="size-4" /> Analytics
               </TabsTrigger>
               <TabsTrigger value="knowledge" className="gap-2 rounded-full">
                 <BookOpen className="size-4" /> Knowledge
@@ -795,6 +799,11 @@ export default function Dashboard() {
           {/* Integrations (Part 22) */}
           <TabsContent value="integrations">
             <IntegrationsTab />
+          </TabsContent>
+
+          {/* Risk analytics (Part 24) */}
+          <TabsContent value="analytics">
+            <Analytics />
           </TabsContent>
 
           {/* Attack knowledge base (Part 23) */}
