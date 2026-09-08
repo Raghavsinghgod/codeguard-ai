@@ -86,6 +86,7 @@ export function ScheduledScans() {
   const dueCount = useQuery(api.schedules.dueCount) ?? 0;
 
   const runDue = useAction(api.scheduleRuns.runDue);
+  const dispatchWebhooks = useAction(api.integrationDelivery.dispatchDue);
   const createSchedule = useMutation(api.schedules.createSchedule);
   const toggleSchedule = useMutation(api.schedules.toggleSchedule);
   const deleteSchedule = useMutation(api.schedules.deleteSchedule);
@@ -101,10 +102,12 @@ export function ScheduledScans() {
     if (dueCount === 0 || running) return;
     setRunning(true);
     runDue({ notify })
-      .then((results) => {
+      .then(async (results) => {
         const ok = results.filter((r) => r.ok).length;
         if (ok > 0) toast.success(`Ran ${ok} scheduled scan${ok === 1 ? "" : "s"}`);
         for (const r of results.filter((x) => !x.ok)) toast.error(r.message);
+        // Best-effort fan-out of any new drift alerts to registered webhooks.
+        await dispatchWebhooks({});
       })
       .catch((e: Error) => toast.error(e.message))
       .finally(() => setRunning(false));
@@ -119,6 +122,8 @@ export function ScheduledScans() {
       if (ok > 0) toast.success(`Ran ${ok} scheduled scan${ok === 1 ? "" : "s"}`);
       else toast.info("No schedules are due yet");
       for (const r of results.filter((x) => !x.ok)) toast.error(r.message);
+      // Best-effort fan-out of any new drift alerts to registered webhooks.
+      await dispatchWebhooks({});
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Scheduled run failed");
     } finally {

@@ -25,6 +25,7 @@ import {
   TrendingUp,
   Upload,
   Users,
+  Webhook,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,7 @@ import { RoadmapView } from "@/components/RoadmapView";
 import { TeamTab } from "@/components/TeamTab";
 import { ReportCenter } from "@/components/ReportCenter";
 import { ScheduledScans } from "@/components/ScheduledScans";
+import { IntegrationsTab } from "@/components/IntegrationsTab";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
@@ -339,7 +341,7 @@ export default function Dashboard() {
             </span>
             <span className="font-semibold tracking-tight">CrackScope</span>
             <Badge variant="outline" className="rounded-full font-mono text-[10px] text-muted-foreground">
-              {21}/25 shipped
+              {22}/25 shipped
             </Badge>
           </div>
           <div className="ml-auto flex items-center gap-3">
@@ -379,6 +381,9 @@ export default function Dashboard() {
               </TabsTrigger>
               <TabsTrigger value="scheduled" className="gap-2 rounded-full">
                 <CalendarClock className="size-4" /> Scheduled
+              </TabsTrigger>
+              <TabsTrigger value="integrations" className="gap-2 rounded-full">
+                <Webhook className="size-4" /> Integrations
               </TabsTrigger>
               <TabsTrigger value="team" className="gap-2 rounded-full">
                 <Users className="size-4" /> Team
@@ -780,6 +785,11 @@ export default function Dashboard() {
           {/* Scheduled & recurring scans (Part 21) */}
           <TabsContent value="scheduled">
             <ScheduledScans />
+          </TabsContent>
+
+          {/* Integrations (Part 22) */}
+          <TabsContent value="integrations">
+            <IntegrationsTab />
           </TabsContent>
 
           {/* Team workspaces (Part 19) */}
