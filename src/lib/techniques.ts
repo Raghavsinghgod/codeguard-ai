@@ -31,7 +31,7 @@ export const TECHNIQUES: Technique[] = [
     category: "injection",
     severity: "critical",
     owasp: "A03:2021 – Injection",
-    ruleIds: ["SQLI-CONCAT", "SQLI-TEMPLATE", "SQLI-ORM-RAW"],
+    ruleIds: ["SQLI-001", "SQLI-002", "ORM-001"],
     summary:
       "User-controlled input is concatenated into SQL, letting an attacker change query semantics to read, modify, or delete arbitrary rows.",
     attackFlow: [
@@ -56,7 +56,7 @@ export const TECHNIQUES: Technique[] = [
     category: "command-injection",
     severity: "critical",
     owasp: "A03:2021 – Injection",
-    ruleIds: ["CMD-INJECT", "EXEC-SINK", "OS-SYSTEM"],
+    ruleIds: ["CMD-001", "CMD-002"],
     summary:
       "Input reaches exec/spawn/system calls, allowing arbitrary OS commands — often a full server compromise from a single parameter.",
     attackFlow: [
@@ -80,7 +80,7 @@ export const TECHNIQUES: Technique[] = [
     category: "xss",
     severity: "high",
     owasp: "A03:2021 – Injection",
-    ruleIds: ["XSS-RAW-HTML", "XSS-DOM-INNERHTML", "XSS-REACT-DANGER"],
+    ruleIds: ["XSS-001", "XSS-002"],
     summary:
       "Unescaped user input is rendered into HTML or the DOM, executing attacker JavaScript in victims' browsers — session theft, keylogging, defacement.",
     attackFlow: [
@@ -104,7 +104,7 @@ export const TECHNIQUES: Technique[] = [
     category: "path-traversal",
     severity: "high",
     owasp: "A01:2021 – Broken Access Control",
-    ruleIds: ["PATH-TRAVERSAL", "FS-JOIN-USER-INPUT"],
+    ruleIds: ["PATH-001"],
     summary:
       "Filename input reaches fs read/write calls without normalization, letting ../ escape the intended directory and read secrets like /etc/passwd or .env.",
     attackFlow: [
@@ -128,7 +128,7 @@ export const TECHNIQUES: Technique[] = [
     category: "ssrf",
     severity: "high",
     owasp: "A10:2021 – SSRF",
-    ruleIds: ["SSRF-FETCH", "SSRF-URL-INPUT"],
+    ruleIds: ["SSRF-001", "NET-003"],
     summary:
       "A URL parameter is fetched server-side, letting attackers reach internal services, cloud metadata endpoints (169.254.169.254), and loopback ports.",
     attackFlow: [
@@ -152,7 +152,7 @@ export const TECHNIQUES: Technique[] = [
     category: "secrets",
     severity: "critical",
     owasp: "A07:2021 – Identification and Authentication Failures",
-    ruleIds: ["SECRET-AWS-KEY", "SECRET-STRIPE", "SECRET-GITHUB-TOKEN", "SECRET-PRIVATE-KEY", "SECRET-GENERIC"],
+    ruleIds: ["SECRET-AWS-AKID", "SECRET-AWS-SECRET", "SECRET-STRIPE", "SECRET-GITHUB", "SECRET-PRIVATEKEY", "SECRET-ENTROPY", "SEC-001"],
     summary:
       "API keys, tokens, and private keys committed to source. Anyone with repo access — or a leaked repo — gains production access immediately.",
     attackFlow: [
@@ -176,7 +176,7 @@ export const TECHNIQUES: Technique[] = [
     category: "auth",
     severity: "high",
     owasp: "A07:2021 – Identification and Authentication Failures",
-    ruleIds: ["JWT-WEAK-SECRET", "JWT-NONE-ALG", "JWT-NO-VERIFY"],
+    ruleIds: ["AUTH-001", "JWT-002", "JWT-003", "JWT-004"],
     summary:
       "JWTs signed with weak/guessable secrets, the `none` algorithm, or verified without signature checks let attackers mint any identity, including admin.",
     attackFlow: [
@@ -200,7 +200,7 @@ export const TECHNIQUES: Technique[] = [
     category: "access-control",
     severity: "high",
     owasp: "A01:2021 – Broken Access Control",
-    ruleIds: ["IDOR-ROUTE-PARAM", "AUTHZ-MISSING", "IDOR-QUERY-PARAM"],
+    ruleIds: ["AUTH-002", "NET-001", "PRIV-001", "PRIV-002"],
     summary:
       "Endpoints trust client-supplied object IDs without ownership checks — changing /invoices/1234 to /invoices/1235 reads someone else's data.",
     attackFlow: [
@@ -224,7 +224,7 @@ export const TECHNIQUES: Technique[] = [
     category: "deserialization",
     severity: "critical",
     owasp: "A08:2021 – Software and Data Integrity Failures",
-    ruleIds: ["PICKLE-LOADS", "DESERIALIZE-UNSAFE", "YAML-UNSAFE-LOAD"],
+    ruleIds: ["DESER-001"],
     summary:
       "Untrusted bytes deserialized with pickle/unserialize/yaml.load execute embedded objects — a direct remote-code-execution primitive.",
     attackFlow: [
@@ -248,7 +248,7 @@ export const TECHNIQUES: Technique[] = [
     category: "crypto",
     severity: "high",
     owasp: "A02:2021 – Cryptographic Failures",
-    ruleIds: ["CRYPTO-MD5", "CRYPTO-SHA1", "CRYPTO-ECB", "CRYPTO-WEAK-RANDOM", "CRYPTO-HARDCODED-IV"],
+    ruleIds: ["CRYPTO-001", "CRYPTO-002", "CRYPTO-003", "CPBK-001", "CRAND-001", "CIV-001", "CIV-002", "CDES-001"],
     summary:
       "MD5/SHA-1 password hashing, ECB block mode, Math.random for tokens, and static IVs collapse the guarantees the crypto was meant to provide.",
     attackFlow: [
@@ -272,7 +272,7 @@ export const TECHNIQUES: Technique[] = [
     category: "dependencies",
     severity: "high",
     owasp: "A06:2021 – Vulnerable and Outdated Components",
-    ruleIds: ["DEP-VULN-VERSION", "DEP-WILDCARD", "DEP-UNPINNED"],
+    ruleIds: ["DEP-001", "DEP-002", "DEP-003", "SUPPLY-001", "SUPPLY-002", "SUPPLY-003"],
     summary:
       "Known-vulnerable package versions (lodash prototype pollution, ejs RCE, axios SSRF…) ship to production; public exploits exist for most.",
     attackFlow: [
@@ -296,7 +296,7 @@ export const TECHNIQUES: Technique[] = [
     category: "prototype-pollution",
     severity: "high",
     owasp: "A03:2021 – Injection",
-    ruleIds: ["PROTO-POLLUTION-MERGE", "DEEP-MERGE-UNSAFE"],
+    ruleIds: ["PROTO-001"],
     summary:
       "Deep-merge/recursive-extend helpers that trust client JSON let __proto__ payloads rewrite Object.prototype — flipping default-role and other security flags globally.",
     attackFlow: [
@@ -320,7 +320,7 @@ export const TECHNIQUES: Technique[] = [
     category: "open-redirect",
     severity: "medium",
     owasp: "A01:2021 – Broken Access Control",
-    ruleIds: ["REDIRECT-USER-INPUT", "OPEN-REDIRECT"],
+    ruleIds: ["REDIR-001", "NET-004"],
     summary:
       "Redirect targets taken from request data turn your trusted domain into a phishing launchpad — and often leak OAuth codes along the way.",
     attackFlow: [
@@ -344,7 +344,7 @@ export const TECHNIQUES: Technique[] = [
     category: "cors",
     severity: "medium",
     owasp: "A05:2021 – Security Misconfiguration",
-    ruleIds: ["CORS-WILDCARD", "CORS-REFLECT-ORIGIN", "CORS-CREDENTIALS-WILDCARD"],
+    ruleIds: ["CONFIG-001", "NET-002"],
     summary:
       "Wildcard or origin-reflecting CORS with credentials=true lets any origin read authenticated responses cross-origin.",
     attackFlow: [
@@ -368,7 +368,7 @@ export const TECHNIQUES: Technique[] = [
     category: "cicd",
     severity: "critical",
     owasp: "A08:2021 – Software and Data Integrity Failures",
-    ruleIds: ["CICD-UNSAFE-CURL", "CICD-INJECT-ENV", "CICD-SECRETS-IN-LOG", "DOCKER-ROOT-USER", "IAC-OPEN-SECURITY-GROUP"],
+    ruleIds: ["CI-001", "CI-002", "CI-003", "CI-004", "CI-005", "CI-006", "CI-007", "CI-008", "IAC-001", "IAC-002", "IAC-003"],
     summary:
       "Pipelines that curl|bash from untrusted sources, interpolate PR-controlled values into shell, or log secrets give attackers persistent code execution in your build and deploy chain.",
     attackFlow: [
@@ -392,7 +392,7 @@ export const TECHNIQUES: Technique[] = [
     category: "injection",
     severity: "high",
     owasp: "A03:2021 – Injection",
-    ruleIds: ["NOSQL-INJECT", "LDAP-INJECT", "TEMPLATE-INJECT"],
+    ruleIds: ["NOSQL-001", "ORM-002", "LDAP-001", "LDAP-002", "SSTI-001", "SSTI-002"],
     summary:
       "Document stores and directory services accept operator dicts or filter strings built from input — $gt empty-object logins and LDAP filter bypasses follow.",
     attackFlow: [
@@ -416,7 +416,7 @@ export const TECHNIQUES: Technique[] = [
     category: "session",
     severity: "medium",
     owasp: "A07:2021 – Identification and Authentication Failures",
-    ruleIds: ["SESSION-FIXATION", "COOKIE-NO-HTTPONLY", "COOKIE-NO-SECURE", "SESSION-PREDICTABLE"],
+    ruleIds: ["SESS-001", "SESS-002", "SESS-003"],
     summary:
       "Cookies without HttpOnly/Secure/SameSite flags, predictable session ids, and fixation-prone login flows hand sessions to network attackers and subdomains.",
     attackFlow: [
@@ -440,7 +440,7 @@ export const TECHNIQUES: Technique[] = [
     category: "info-disclosure",
     severity: "medium",
     owasp: "A09:2021 – Security Logging and Monitoring Failures",
-    ruleIds: ["ERR-STACK-EXPOSED", "DEBUG-ENABLED", "PII-IN-LOGS", "CONFIG-EXPOSED"],
+    ruleIds: ["CONFIG-002", "CWE-532"],
     summary:
       "Stack traces, debug flags, verbose logs, and exposed config endpoints reveal internals — file paths, dependency versions, query shapes — accelerating every other technique.",
     attackFlow: [
@@ -464,7 +464,7 @@ export const TECHNIQUES: Technique[] = [
     category: "access-control",
     severity: "high",
     owasp: "A04:2021 – Insecure Design",
-    ruleIds: ["MASS-ASSIGNMENT", "REQ-BODY-DIRECT-SAVE"],
+    ruleIds: ["NOSQL-001", "ORM-002", "AUTH-002"],
     summary:
       "Request bodies saved straight into the datastore let attackers set fields the API never intended — role, is_admin, price — by simply including them.",
     attackFlow: [
@@ -488,7 +488,7 @@ export const TECHNIQUES: Technique[] = [
     category: "dos",
     severity: "medium",
     owasp: "A05:2021 – Security Misconfiguration",
-    ruleIds: ["REDOC-REGEX", "BODY-LIMIT-MISSING", "REGEX-CATASTROPHIC"],
+    ruleIds: ["FUZZ-001", "FUZZ-003", "FUZZ-004", "FUZZ-006"],
     summary:
       "Catastrophic backtracking regexes and unbounded request bodies let a single crafted request pin a CPU core or exhaust memory — cheap, repeated, and hard to attribute.",
     attackFlow: [

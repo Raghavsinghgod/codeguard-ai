@@ -217,17 +217,24 @@ export const apiGetScan = httpAction(async (ctx, request) => {
   if (!auth) return unauthorized();
 
   const rawId = new URL(request.url).pathname.split("/").pop() ?? "";
-  const row = (await actx.runQuery(internal.publicApiInternals.getUserScan, {
-    userId: auth.userId,
-    scanId: rawId as never,
-  })) as {
+  type ApiScanRow = {
     _id: string;
     name: string;
     createdAt: number;
     score: number;
     grade: string;
     findings: unknown;
-  } | null;
+  };
+  let row: ApiScanRow | null = null;
+  try {
+    row = (await actx.runQuery(internal.publicApiInternals.getUserScan, {
+      userId: auth.userId,
+      scanId: rawId as never,
+    })) as ApiScanRow | null;
+  } catch {
+    // Malformed id (not a valid Convex document id) → treat as not found.
+    return json({ error: "scan not found" }, 404);
+  }
   if (!row) return json({ error: "scan not found" }, 404);
 
   await actx.runMutation(internal.publicApiInternals.touchKey, { id: auth.keyId });

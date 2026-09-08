@@ -69,11 +69,11 @@ export default function ApiTab() {
   const [creating, setCreating] = useState(false);
   const [freshKey, setFreshKey] = useState<string | null>(null);
 
-  const siteUrl =
-    typeof window !== "undefined"
-      ? `${window.location.protocol}//${window.location.hostname.replace(/^www\./, "")}`.replace(/:\d+$/, "")
-      : "https://your-crackscope-host";
-  const apiBase = "https://quixotic-sheep-69.convex.site";
+  // HTTP routes are served on the deployment's *.convex.site host — derive it
+  // from the configured Convex URL instead of hardcoding a deployment name.
+  const apiBase =
+    (import.meta.env.VITE_CONVEX_URL as string | undefined)?.replace(/\.cloud\b/, ".site") ??
+    "https://your-deployment.convex.site";
 
   const handleCreate = async () => {
     setCreating(true);
