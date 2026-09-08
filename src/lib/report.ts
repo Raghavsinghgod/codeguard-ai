@@ -35,6 +35,7 @@ const CATEGORY_VECTOR: Record<string, VectorParts> = {
   "Broken Access Control": { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "H", I: "L", A: "N" },
   "Vulnerable Dependencies": { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "H", I: "L", A: "N" },
   "Fuzzing / Robustness": { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "L", I: "N", A: "H" },
+  "Auth & Session Attacks": { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "H", I: "H", A: "L" },
 };
 
 const BAND: Record<Severity, [number, number]> = {

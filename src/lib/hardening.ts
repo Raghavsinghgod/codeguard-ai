@@ -413,6 +413,122 @@ const GUIDES: Record<string, HardeningGuide> = {
     after: "logger.info({ event: \"login\", user: sanitize(req.body.name) });",
     verify: "Re-scan; a name containing \\u202E no longer corrupts the log line.",
   },
+  // Auth & session attack pass (Part 14)
+  "JWT-002": {
+    difficulty: "easy",
+    effort: "~20 min",
+    steps: [
+      "Pin exactly one algorithm per verification path (algorithms: ['RS256']).",
+      "Keep asymmetric and symmetric verification in separate code paths.",
+      "Reject tokens whose header alg differs from the pinned value.",
+    ],
+    before: "jwt.verify(token, key, { algorithms: ['HS256', 'RS256'] });",
+    after: "jwt.verify(token, publicKey, { algorithms: ['RS256'] });",
+    verify: "Re-scan; craft an HS256-signed token with the public key — expect rejection.",
+  },
+  "JWT-003": {
+    difficulty: "easy",
+    effort: "~20 min + rotation",
+    steps: [
+      "Move the signing secret to a secret manager / environment (≥256-bit random).",
+      "Rotate the exposed secret; support kid-based key rotation.",
+      "Purge the old value from git history.",
+    ],
+    before: 'jwt.sign(payload, "s3cr3t-key", { expiresIn: "1h" });',
+    after: "jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: \"1h\" });",
+    verify: "Re-scan; tokens signed with the old secret must be rejected.",
+  },
+  "JWT-004": {
+    difficulty: "easy",
+    effort: "~15 min",
+    steps: [
+      "Replace jwt.decode with jwt.verify wherever claims drive authorization.",
+      "Reserve decode for pre-inspection/logging only.",
+    ],
+    before: "const claims = jwt.decode(token); if (claims.role === 'admin') allow();",
+    after: "const claims = jwt.verify(token, publicKey, { algorithms: ['RS256'] });\nif (claims.role === 'admin') allow();",
+    verify: "Re-scan; a token with a garbage signature must now be rejected with 401.",
+  },
+  "SESS-001": {
+    difficulty: "easy",
+    effort: "~20 min",
+    steps: [
+      "Regenerate the session id immediately after successful login.",
+      "Never accept session ids from URLs or query parameters.",
+    ],
+    before: "req.session.user = user; // same pre-auth session id kept",
+    after: "req.session.regenerate((err) => {\n  req.session.user = user;\n  res.redirect('/dashboard');\n});",
+    verify: "Re-scan; log in and confirm the session cookie value changed.",
+  },
+  "SESS-002": {
+    difficulty: "trivial",
+    effort: "~10 min",
+    steps: [
+      "Set secure: true, httpOnly: true, sameSite: 'lax' on every session cookie.",
+      "Force HTTPS with HSTS so secure cookies are never downgraded.",
+    ],
+    before: "res.cookie('sid', id, { maxAge: 86400000 });",
+    after: "res.cookie('sid', id, { maxAge: 86400000, secure: true, httpOnly: true, sameSite: 'lax' });",
+    verify: "Re-scan; check Set-Cookie headers with curl -I — all three flags present.",
+  },
+  "SESS-003": {
+    difficulty: "easy",
+    effort: "~30 min",
+    steps: [
+      "Set a bounded session lifetime with rolling renewal on activity.",
+      "Store a server-side session version to enable instant revocation.",
+    ],
+    before: "req.session.cookie.maxAge = Infinity;",
+    after: "req.session.cookie.maxAge = 24 * 60 * 60 * 1000; // 24h, rolling",
+    verify: "Re-scan; a session idle for >24h must require re-authentication.",
+  },
+  "PRIV-001": {
+    difficulty: "moderate",
+    effort: "~1–2 h",
+    steps: [
+      "Read roles exclusively from the verified session or signed token claims.",
+      "Treat every request-supplied identity field as untrusted data.",
+      "Add a regression test that posts role=admin as a normal user.",
+    ],
+    before: "if (req.body.role === 'admin') { grantAdmin(); }",
+    after: "const session = await getSession(req); // server-side only\nif (session?.role === 'admin') { grantAdmin(); }",
+    verify: "Re-scan; POST role=admin as a normal user must have no effect.",
+  },
+  "PRIV-002": {
+    difficulty: "moderate",
+    effort: "~1 h per route group",
+    steps: [
+      "Attach role middleware to every admin/destructive route.",
+      "Default-deny: routes are admin-only unless explicitly opened.",
+      "Enumerate routes in CI to catch future unguarded admin endpoints.",
+    ],
+    before: 'router.delete("/admin/users/:id", handler);',
+    after: 'router.delete("/admin/users/:id", requireRole("admin"), handler);',
+    verify: "Re-scan; call the route as a regular user — expect 403.",
+  },
+  "BRUTE-001": {
+    difficulty: "easy",
+    effort: "~30 min",
+    steps: [
+      "Add per-IP and per-account rate limiting (express-rate-limit or equivalent).",
+      "Add temporary lockout or exponential backoff after repeated failures.",
+      "Screen passwords against breached-password corpora (HIBP k-anonymity).",
+    ],
+    before: 'app.post("/login", loginHandler);',
+    after: 'app.post("/login", loginLimiter, loginHandler);\n// loginLimiter: 5 attempts / 15 min per IP+account, then 429',
+    verify: "Re-scan; 20 rapid failed logins must trigger 429/lockout.",
+  },
+  "BRUTE-002": {
+    difficulty: "trivial",
+    effort: "~10 min",
+    steps: [
+      "Replace === secret comparisons with a constant-time comparison.",
+      "Prefer bcrypt.compare / argon2.verify for passwords.",
+    ],
+    before: "if (user.password === req.body.password) { login(); }",
+    after: "const ok = await bcrypt.compare(req.body.password, user.passwordHash);\nif (ok) { login(); }",
+    verify: "Re-scan; timing across candidate bytes no longer correlates with correctness.",
+  },
 };
 
 // Category fallback for anything without a dedicated guide.

@@ -8,6 +8,7 @@ import { computeTaint, isLineTainted } from "./taint";
 import { detectSecrets } from "./secrets";
 import { auditDependencies } from "./deps";
 import { runFuzzing } from "./fuzz";
+import { detectAuthAttacks } from "./authattacks";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -434,6 +435,10 @@ export function scan(inputs: ScanInput[]): ScanResult {
     // Part 13: fuzzing pass — mutation strategies over user-controlled flows
     // with crash-pattern heuristics (ReDoS, OOM, parse crashes, OOB).
     findings.push(...runFuzzing(input, reportedLines));
+
+    // Part 14: auth & session attack pass — JWT confusion, session fixation,
+    // privilege escalation, brute-force surface (structure rules, no taint).
+    findings.push(...detectAuthAttacks(input, reportedLines));
   }
 
   findings.sort((a, b) => {

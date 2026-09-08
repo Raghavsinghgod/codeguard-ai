@@ -48,6 +48,17 @@ const RULE_CWE: Record<string, CweRef> = {
   "FUZZ-005": { id: "CWE-755", name: "Improper Handling of Exceptional Conditions (type confusion)", owasp: "A04" },
   "FUZZ-006": { id: "CWE-129", name: "Improper Validation of Array Index", owasp: "A04" },
   "FUZZ-007": { id: "CWE-117", name: "Improper Output Neutralization for Logs", owasp: "A04" },
+  // Auth & session attack pass (Part 14)
+  "JWT-002": { id: "CWE-347", name: "Improper Verification of Cryptographic Signature (algorithm confusion)", owasp: "A07" },
+  "JWT-003": { id: "CWE-798", name: "Use of Hard-coded Credentials (JWT secret)", owasp: "A07" },
+  "JWT-004": { id: "CWE-347", name: "Improper Verification of Cryptographic Signature (decode-only trust)", owasp: "A07" },
+  "SESS-001": { id: "CWE-384", name: "Session Fixation", owasp: "A07" },
+  "SESS-002": { id: "CWE-1004", name: "Sensitive Cookie Without 'HttpOnly' Flag", owasp: "A07" },
+  "SESS-003": { id: "CWE-613", name: "Insufficient Session Expiration", owasp: "A07" },
+  "PRIV-001": { id: "CWE-807", name: "Reliance on Untrusted Inputs in a Security Decision", owasp: "A01" },
+  "PRIV-002": { id: "CWE-862", name: "Missing Authorization", owasp: "A01" },
+  "BRUTE-001": { id: "CWE-307", name: "Improper Restriction of Excessive Authentication Attempts", owasp: "A07" },
+  "BRUTE-002": { id: "CWE-208", name: "Observable Timing Discrepancy in Password Comparison", owasp: "A07" },
 };
 
 /** CWE reference for a rule id; SECRET-* provider rules all map to CWE-798 / A02. */
@@ -84,6 +95,7 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
       { id: "AUTH-002", label: "IDOR hunting on parameter-resolved routes", status: "tested" },
       { id: "PATH-001", label: "Path traversal in file access", status: "tested" },
       { id: "REDIR-001", label: "Unvalidated redirect targets", status: "tested" },
+      { id: "PRIV-", label: "Privilege escalation: client-trusted roles, unguarded admin routes", status: "tested" },
     ],
   },
   {
@@ -144,7 +156,9 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
     description: "Weak session handling and authentication bypasses.",
     checks: [
       { id: "AUTH-001", label: "JWT algorithm confusion & weak secrets", status: "tested" },
-      { id: "SESSION-", label: "Session fixation & flow attack modules (Part 14)", status: "planned" },
+      { id: "JWT-", label: "JWT deep checks: alg confusion, hardcoded secrets, decode-only trust", status: "tested" },
+      { id: "SESS-", label: "Session fixation, cookie hygiene, session expiry", status: "tested" },
+      { id: "BRUTE-", label: "Credential-stuffing surface & timing-safe comparison", status: "tested" },
     ],
   },
   {
@@ -257,7 +271,7 @@ export function buildCompliance(result: ScanResult): ComplianceReport {
   const gaps = categories.filter((c) => c.testedChecks < c.totalChecks);
   if (gaps.length > 0) {
     summary.push(
-      `Scope notes for auditors: ${gaps.map((c) => c.category.id).join(", ")} include planned checks not yet automated in this tier (IaC scanning, session-attack modules, logging/monitoring detection). Partial coverage there is provided by the AI deep-analysis pass where run.`,
+      `Scope notes for auditors: ${gaps.map((c) => c.category.id).join(", ")} include planned checks not yet automated in this tier (IaC scanning, logging/monitoring detection). Partial coverage there is provided by the AI deep-analysis pass where run.`,
     );
   }
 
