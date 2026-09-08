@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
   Crosshair,
+  BookOpen,
   CalendarClock,
   FileOutput,
   FlaskConical,
@@ -41,6 +42,7 @@ import { TeamTab } from "@/components/TeamTab";
 import { ReportCenter } from "@/components/ReportCenter";
 import { ScheduledScans } from "@/components/ScheduledScans";
 import { IntegrationsTab } from "@/components/IntegrationsTab";
+import KnowledgeBase from "@/components/KnowledgeBase";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
@@ -341,7 +343,7 @@ export default function Dashboard() {
             </span>
             <span className="font-semibold tracking-tight">CrackScope</span>
             <Badge variant="outline" className="rounded-full font-mono text-[10px] text-muted-foreground">
-              {22}/25 shipped
+              {23}/25 shipped
             </Badge>
           </div>
           <div className="ml-auto flex items-center gap-3">
@@ -384,6 +386,9 @@ export default function Dashboard() {
               </TabsTrigger>
               <TabsTrigger value="integrations" className="gap-2 rounded-full">
                 <Webhook className="size-4" /> Integrations
+              </TabsTrigger>
+              <TabsTrigger value="knowledge" className="gap-2 rounded-full">
+                <BookOpen className="size-4" /> Knowledge
               </TabsTrigger>
               <TabsTrigger value="team" className="gap-2 rounded-full">
                 <Users className="size-4" /> Team
@@ -790,6 +795,11 @@ export default function Dashboard() {
           {/* Integrations (Part 22) */}
           <TabsContent value="integrations">
             <IntegrationsTab />
+          </TabsContent>
+
+          {/* Attack knowledge base (Part 23) */}
+          <TabsContent value="knowledge">
+            <KnowledgeBase />
           </TabsContent>
 
           {/* Team workspaces (Part 19) */}
