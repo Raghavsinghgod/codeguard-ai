@@ -82,6 +82,18 @@ const RULE_CWE: Record<string, CweRef> = {
   "NET-002": { id: "CWE-942", name: "Permissive Cross-domain Policy with Untrusted Origins", owasp: "A05" },
   "NET-003": { id: "CWE-918", name: "Server-Side Request Forgery (internal surface)", owasp: "A10" },
   "NET-004": { id: "CWE-601", name: "Open Redirect (absolute target)", owasp: "A01" },
+  // CI/CD & pipeline pass (Part 18)
+  "CI-001": { id: "CWE-1357", name: "Reliance on Uncontrolled Component (mutable action tag)", owasp: "A08" },
+  "CI-002": { id: "CWE-94", name: "Code Injection via workflow (pull_request_target)", owasp: "A08" },
+  "CI-003": { id: "CWE-94", name: "Code Injection via GitHub context script injection", owasp: "A08" },
+  "CI-004": { id: "CWE-250", name: "Execution with Unnecessary Privileges (GITHUB_TOKEN)", owasp: "A05" },
+  "CI-005": { id: "CWE-532", name: "Insertion of Sensitive Information into Log File", owasp: "A09" },
+  "CI-006": { id: "CWE-250", name: "Execution with Unnecessary Privileges (root container)", owasp: "A05" },
+  "CI-007": { id: "CWE-1357", name: "Reliance on Uncontrolled Component (mutable base image)", owasp: "A08" },
+  "CI-008": { id: "CWE-798", name: "Use of Hard-coded Credentials (image layers)", owasp: "A02" },
+  "IAC-001": { id: "CWE-16", name: "Configuration (open security groups)", owasp: "A05" },
+  "IAC-002": { id: "CWE-798", name: "Use of Hard-coded Credentials (IaC)", owasp: "A02" },
+  "IAC-003": { id: "CWE-732", name: "Incorrect Permission Assignment for Critical Resource (public storage)", owasp: "A01" },
 };
 
 /** CWE reference for a rule id; SECRET-* provider rules all map to CWE-798 / A02. */
@@ -170,7 +182,10 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
       { id: "CONFIG-001", label: "Permissive CORS policies", status: "tested" },
       { id: "CONFIG-002", label: "Debug mode / verbose errors exposed", status: "tested" },
       { id: "NET-002", label: "CORS origin reflection with credentials", status: "tested" },
-      { id: "IAC-", label: "IaC & pipeline configuration scanning (Part 18)", status: "planned" },
+      { id: "CI-004", label: "Excessive workflow/CI privileges", status: "tested" },
+      { id: "CI-006", label: "Root container / image hardening", status: "tested" },
+      { id: "IAC-001", label: "Open security-group ingress", status: "tested" },
+      { id: "IAC-003", label: "Public storage/snapshot exposure", status: "tested" },
     ],
   },
   {
@@ -201,6 +216,8 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
     checks: [
       { id: "DESER-001", label: "Unsafe deserialization of untrusted data", status: "tested" },
       { id: "SUPPLY-001", label: "Malicious install-script patterns", status: "tested" },
+      { id: "CI-", label: "Pipeline integrity: action pinning, PR-target abuse, context injection", status: "tested" },
+      { id: "CI-007", label: "Mutable base-image tags", status: "tested" },
     ],
   },
   {
@@ -209,6 +226,7 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
     description: "Missing detection, alerting, and response capability.",
     checks: [
       { id: "LOG-", label: "Audit-logging & alerting detection (future part)", status: "planned" },
+      { id: "CI-005", label: "Secret leakage through CI logs", status: "tested" },
     ],
   },
   {

@@ -757,6 +757,129 @@ const GUIDES: Record<string, HardeningGuide> = {
     after: "const t = String(req.query.next ?? '/');\nres.redirect(t.startsWith('/') && !t.startsWith('//') ? t : '/');",
     verify: "Re-scan; next=//evil.tld must fall back to the default path.",
   },
+  // CI/CD & pipeline pass (Part 18)
+  "CI-001": {
+    difficulty: "trivial",
+    effort: "~5 min per action",
+    steps: [
+      "Pin the action to a full 40-char commit SHA with a version comment.",
+      "Enable Dependabot for github-action ecosystems to keep pins updated.",
+    ],
+    before: "uses: tj-actions/changed-files@v41",
+    after: "uses: tj-actions/changed-files@2afcb99 # v41",
+    verify: "Re-scan; no third-party action referenced by mutable tag remains.",
+  },
+  "CI-002": {
+    difficulty: "moderate",
+    effort: "~2–4 h",
+    steps: [
+      "Use pull_request (sandboxed) for anything that checks out PR code.",
+      "Keep pull_request_target only for label/comment workflows with no checkout.",
+      "Pass data between jobs via artifacts, never via checkout.",
+    ],
+    before: 'on: pull_request_target\n- uses: actions/checkout@main\n  with: { ref: "refs/pull/123/merge" }',
+    after: 'on: pull_request  # sandboxed, no secrets',
+    verify: "Re-scan; no pull_request_target job checks out PR code.",
+  },
+  "CI-003": {
+    difficulty: "easy",
+    effort: "~20 min",
+    steps: [
+      "Move untrusted context into env: variables.",
+      "Reference the env var in the run: script instead of the expression.",
+    ],
+    before: "run: echo \"PR title: ${{ github.event.pull_request.title }}\"",
+    after: "env: TITLE: ${{ github.event.pull_request.title }}\nrun: echo \"PR title: $TITLE\"",
+    verify: "Re-scan; a PR title containing shell metacharacters executes nothing.",
+  },
+  "CI-004": {
+    difficulty: "trivial",
+    effort: "~10 min",
+    steps: [
+      "Add a top-level permissions block with the minimum scopes.",
+      "Grant per-job scopes; start from contents: read.",
+    ],
+    before: "on: push\njobs: ...",
+    after: "permissions: {}\njobs:\n  build:\n    permissions:\n      contents: read",
+    verify: "Re-scan; every workflow has an explicit minimal permissions block.",
+  },
+  "CI-005": {
+    difficulty: "easy",
+    effort: "~15 min",
+    steps: [
+      "Pass secrets via env:, never as command-line arguments.",
+      "Remove echo of secrets; add ::add-mask:: for custom values.",
+    ],
+    before: "run: echo \"Token: ${{ secrets.DEPLOY_TOKEN }}\"",
+    after: "env: TOKEN: ${{ secrets.DEPLOY_TOKEN }}\nrun: ./deploy.sh  # reads $TOKEN internally",
+    verify: "Re-scan; workflow logs contain no secret values.",
+  },
+  "CI-006": {
+    difficulty: "easy",
+    effort: "~30 min",
+    steps: [
+      "Create an unprivileged user and add USER to the Dockerfile.",
+      "Drop capabilities and set no-new-privileges at runtime.",
+    ],
+    before: 'FROM node:20\nCMD ["node", "server.js"]',
+    after: 'FROM node:20\nRUN adduser --system --uid 10001 app\nUSER app\nCMD ["node", "server.js"]',
+    verify: "Re-scan; `docker run --rm image whoami` returns a non-root user.",
+  },
+  "CI-007": {
+    difficulty: "trivial",
+    effort: "~5 min",
+    steps: [
+      "Pin the base image to a specific version tag (or digest).",
+      "Automate updates via renovate/dependabot.",
+    ],
+    before: "FROM node:latest",
+    after: "FROM node:20.11.1-slim@sha256:e6a3...",
+    verify: "Re-scan; no latest/unpinned FROM lines remain.",
+  },
+  "CI-008": {
+    difficulty: "moderate",
+    effort: "~1–2 h",
+    steps: [
+      "Remove ENV/ADD of credentials; rotate the exposed values.",
+      "Inject secrets at runtime (secret manager, BuildKit --mount=type=secret).",
+    ],
+    before: "ENV AWS_SECRET_ACCESS_KEY=wJalr...",
+    after: "# runtime: --mount=type=secret,id=aws,env=AWS_SECRET_ACCESS_KEY",
+    verify: "Re-scan; docker history shows no secret values.",
+  },
+  "IAC-001": {
+    difficulty: "easy",
+    effort: "~20 min",
+    steps: [
+      "Restrict ingress to VPC CIDRs or bastion/VPN addresses.",
+      "Replace open SSH with SSM/IAP session access.",
+    ],
+    before: 'cidr_blocks = ["0.0.0.0/0"]\nfrom_port = 22',
+    after: 'cidr_blocks = ["10.0.0.0/16"]\nfrom_port = 22  # or SSM-only, no ingress',
+    verify: "Re-scan; no 0.0.0.0/0 on sensitive ports remains.",
+  },
+  "IAC-002": {
+    difficulty: "easy",
+    effort: "~30 min + rotation",
+    steps: [
+      "Reference a secret manager instead of literals.",
+      "Mark variables sensitive; rotate committed values.",
+    ],
+    before: 'db_password = "hunter2secret"',
+    after: 'db_password = data.aws_secretsmanager_secret_version.db.secret_string',
+    verify: "Re-scan; no credential literals in .tf files.",
+  },
+  "IAC-003": {
+    difficulty: "easy",
+    effort: "~20 min",
+    steps: [
+      "Set block_public_acls and ignore_public_acls to true.",
+      "Keep databases private; audit and fix public snapshots.",
+    ],
+    before: "acl = \"public-read\"",
+    after: "# bucket policy with CloudFront OAC instead of public ACLs",
+    verify: "Re-scan; no public ACL/accessible flags remain.",
+  },
 };
 
 // Category fallback for anything without a dedicated guide.

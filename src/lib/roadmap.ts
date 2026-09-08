@@ -63,8 +63,8 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
     parts: [
       p(16, "Injection deep-scan", "SQL/NoSQL/LDAP/template/ORM variants with database-engine-aware payload selection.", "shipped"),
       p(17, "Network surface mapper", "Endpoint discovery, CORS analysis, SSRF surface, and open-redirect graphing.", "shipped"),
-      p(18, "CI/CD & pipeline guardrails", "GitHub Actions, Dockerfile, and Terraform/IaC scanning with pipeline-blocking severity gates.", "up-next"),
-      p(19, "Team workspaces", "Multi-member projects, roles, shared reports, and activity feeds.", "planned"),
+      p(18, "CI/CD & pipeline guardrails", "GitHub Actions, Dockerfile, and Terraform/IaC scanning with pipeline-blocking severity gates.", "shipped"),
+      p(19, "Team workspaces", "Multi-member projects, roles, shared reports, and activity feeds.", "up-next"),
       p(20, "Report center", "Branded pentest reports, client-ready exports, and scheduled email delivery.", "planned"),
     ],
   },

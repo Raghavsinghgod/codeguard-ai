@@ -12,6 +12,7 @@ import { detectAuthAttacks } from "./authattacks";
 import { detectCryptoMisuse } from "./cryptomisuse";
 import { runInjectionDeepScan, detectEngine } from "./injection";
 import { runNetworkScan, type NetworkSurface } from "./network";
+import { runPipelineScan, severityGate, type SeverityGate } from "./cicd";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -46,6 +47,8 @@ export interface ScanResult {
   /** Part 17: network attack-surface map (endpoints, CORS, SSRF, redirects).
    *  Optional: reconstructed-from-history scans may not carry it. */
   surface?: NetworkSurface;
+  /** Part 18: pipeline severity gate verdict for CI/CD files. */
+  pipelineGate?: SeverityGate;
 }
 
 export const SEVERITY_WEIGHT: Record<Severity, number> = {
@@ -470,6 +473,10 @@ export function scan(inputs: ScanInput[]): ScanResult {
     const net = runNetworkScan(input, reportedLines);
     findings.push(...net.findings);
     surfaces.push(net.surface);
+
+    // Part 18: CI/CD & IaC pass — workflow, Dockerfile, and Terraform
+    // rules (only applies to pipeline file families).
+    findings.push(...runPipelineScan(input, reportedLines));
   }
 
   findings.sort((a, b) => {
@@ -498,6 +505,9 @@ export function scan(inputs: ScanInput[]): ScanResult {
     authlessMutating: surfaces.flatMap((s) => s.authlessMutating ?? []),
   };
 
+  // Part 18: severity gate over the pipeline findings.
+  const pipelineGate = severityGate(findings);
+
   return {
     score,
     grade,
@@ -508,6 +518,7 @@ export function scan(inputs: ScanInput[]): ScanResult {
     findings,
     durationMs: Math.round(performance.now() - started),
     surface,
+    pipelineGate,
   };
 }
 
