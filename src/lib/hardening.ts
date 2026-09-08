@@ -334,6 +334,85 @@ const GUIDES: Record<string, HardeningGuide> = {
     after: '"react": "^18.2.0"',
     verify: "Re-scan; the typosquat finding is gone.",
   },
+  // Fuzzing pass (Part 13)
+  "FUZZ-001": {
+    difficulty: "easy",
+    effort: "~30 min per pattern",
+    steps: [
+      "Cap input length before any regex runs on untrusted data.",
+      "Replace risky patterns with linear-time alternatives (RE2, or rewrite nested quantifiers).",
+      "Validate the pattern with safe-regex / recheck in CI.",
+    ],
+    before: 'const ok = /^(a+)+$/.test(req.body.name);',
+    after: 'const ok = req.body.name.length <= 64 && safePattern.test(req.body.name);',
+    verify: "Re-scan; FUZZ-001 findings gone, and a 100k-char input completes in <10ms.",
+  },
+  "FUZZ-002": {
+    difficulty: "trivial",
+    effort: "~10 min per site",
+    steps: [
+      "Validate with a schema (zod) at the boundary instead of raw parsing.",
+      "Check Number.isFinite and clamp to the expected range immediately.",
+    ],
+    before: "const page = parseInt(req.query.page);",
+    after: "const page = pageSchema.parse(req.query.page); // zod: int().min(1).max(1000)",
+    verify: "Re-scan; send 'abc' and '1e999' to the endpoint — expect a clean 400.",
+  },
+  "FUZZ-003": {
+    difficulty: "trivial",
+    effort: "~10 min per site",
+    steps: [
+      "Wrap JSON.parse in try/catch, or use a body parser with strict mode.",
+      "Return 400 (not 500) on malformed input.",
+    ],
+    before: "const data = JSON.parse(req.body.raw);",
+    after: "let data;\ntry { data = JSON.parse(req.body.raw); } catch { return res.status(400).json({ error: \"invalid JSON\" }); }",
+    verify: "Re-scan; POST '{' to the endpoint — expect 400, no stack trace.",
+  },
+  "FUZZ-004": {
+    difficulty: "easy",
+    effort: "~20 min per site",
+    steps: [
+      "Clamp every user-supplied size/count to a hard maximum before allocating.",
+      "Enforce body-size and page-size limits at the edge (proxy or framework).",
+    ],
+    before: "const buf = Buffer.alloc(Number(req.query.size));",
+    after: "const size = Math.min(Number(req.query.size) || 0, 1_048_576);\nconst buf = Buffer.alloc(size);",
+    verify: "Re-scan; request size=2000000000 — expect a clean 413/400, not an OOM kill.",
+  },
+  "FUZZ-005": {
+    difficulty: "easy",
+    effort: "~30 min per handler",
+    steps: [
+      "Validate request bodies against a schema at the boundary (zod/valibot).",
+      "Use optional chaining for defensive nested reads.",
+    ],
+    before: "const city = req.body.user.address.city;",
+    after: "const city = userSchema.parse(req.body).address?.city;",
+    verify: "Re-scan; POST '[1,2]' and 'null' — expect 400, not 500.",
+  },
+  "FUZZ-006": {
+    difficulty: "easy",
+    effort: "~15 min per site",
+    steps: [
+      "Reject non-integer and out-of-range values before use.",
+      "Clamp indices to [0, length-1]; bound loops by a constant max.",
+    ],
+    before: "const item = items[Number(req.query.idx)];\nfor (let i = 0; i < count; i++) process(items[i]);",
+    after: "const idx = clampInt(req.query.idx, 0, items.length - 1);\nconst item = items[idx];\nfor (let i = 0; i < Math.min(count, MAX_ITEMS); i++) process(items[i]);",
+    verify: "Re-scan; send idx=-1 and idx=999999999 — expect bounded behavior.",
+  },
+  "FUZZ-007": {
+    difficulty: "easy",
+    effort: "~30 min",
+    steps: [
+      "Strip control/format characters (\\u202A-\\u202E, \\u200B-\\u200F, \\uFEFF) from input.",
+      "Use structured logging (JSON fields) instead of string interpolation.",
+    ],
+    before: 'logger.info(`User ${req.body.name} logged in`);',
+    after: "logger.info({ event: \"login\", user: sanitize(req.body.name) });",
+    verify: "Re-scan; a name containing \\u202E no longer corrupts the log line.",
+  },
 };
 
 // Category fallback for anything without a dedicated guide.

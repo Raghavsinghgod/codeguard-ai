@@ -52,8 +52,8 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
     parts: [
       p(11, "Triage workflow", "Mark false positives, accept risk, add notes, re-open, and assign owners.", "shipped"),
       p(12, "Scan history & diffing", "Compare scans over time, detect regressions, and track remediation velocity.", "shipped"),
-      p(13, "Fuzzing module", "Simulated input fuzzing of user-controlled flows with mutation strategies and crash-pattern heuristics.", "up-next"),
-      p(14, "Auth & session attacks", "JWT flaws, session fixation, IDOR hunting, and privilege-escalation patterns.", "planned"),
+      p(13, "Fuzzing module", "Simulated input fuzzing of user-controlled flows with mutation strategies and crash-pattern heuristics.", "shipped"),
+      p(14, "Auth & session attacks", "JWT flaws, session fixation, IDOR hunting, and privilege-escalation patterns.", "up-next"),
       p(15, "Crypto misuse detector", "Weak hashes, hardcoded IVs, ECB mode, insecure randomness, and certificate pitfalls.", "planned"),
     ],
   },

@@ -40,6 +40,14 @@ const RULE_CWE: Record<string, CweRef> = {
   "SUPPLY-001": { id: "CWE-494", name: "Download of Code Without Integrity Check", owasp: "A08" },
   "SUPPLY-002": { id: "CWE-1357", name: "Reliance on Uncontrolled Component", owasp: "A06" },
   "SUPPLY-003": { id: "CWE-1357", name: "Reliance on Uncontrolled Component (typosquat risk)", owasp: "A06" },
+  // Fuzzing pass (Part 13)
+  "FUZZ-001": { id: "CWE-1333", name: "Inefficient Regular Expression Complexity (ReDoS)", owasp: "A04" },
+  "FUZZ-002": { id: "CWE-20", name: "Improper Input Validation (numeric parsing)", owasp: "A04" },
+  "FUZZ-003": { id: "CWE-755", name: "Improper Handling of Exceptional Conditions", owasp: "A04" },
+  "FUZZ-004": { id: "CWE-400", name: "Uncontrolled Resource Consumption", owasp: "A04" },
+  "FUZZ-005": { id: "CWE-755", name: "Improper Handling of Exceptional Conditions (type confusion)", owasp: "A04" },
+  "FUZZ-006": { id: "CWE-129", name: "Improper Validation of Array Index", owasp: "A04" },
+  "FUZZ-007": { id: "CWE-117", name: "Improper Output Neutralization for Logs", owasp: "A04" },
 };
 
 /** CWE reference for a rule id; SECRET-* provider rules all map to CWE-798 / A02. */
@@ -107,7 +115,7 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
     description: "Missing or ineffective control design (business-logic level).",
     checks: [
       { id: "AI-", label: "AI business-logic hypotheses (Part 8 deep analysis)", status: "partial" },
-      { id: "FUZZ-", label: "Simulated fuzzing of user-controlled flows (Part 13)", status: "planned" },
+      { id: "FUZZ-", label: "Simulated fuzzing of user-controlled flows (mutation strategies + crash heuristics)", status: "tested" },
     ],
   },
   {
@@ -249,7 +257,7 @@ export function buildCompliance(result: ScanResult): ComplianceReport {
   const gaps = categories.filter((c) => c.testedChecks < c.totalChecks);
   if (gaps.length > 0) {
     summary.push(
-      `Scope notes for auditors: ${gaps.map((c) => c.category.id).join(", ")} include planned checks not yet automated in this tier (business-logic fuzzing, IaC scanning, session-attack modules, logging/monitoring detection). Partial coverage there is provided by the AI deep-analysis pass where run.`,
+      `Scope notes for auditors: ${gaps.map((c) => c.category.id).join(", ")} include planned checks not yet automated in this tier (IaC scanning, session-attack modules, logging/monitoring detection). Partial coverage there is provided by the AI deep-analysis pass where run.`,
     );
   }
 

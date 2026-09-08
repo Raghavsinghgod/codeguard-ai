@@ -34,6 +34,7 @@ const CATEGORY_VECTOR: Record<string, VectorParts> = {
   "Security Misconfiguration": { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "L", I: "L", A: "N" },
   "Broken Access Control": { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "H", I: "L", A: "N" },
   "Vulnerable Dependencies": { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "H", I: "L", A: "N" },
+  "Fuzzing / Robustness": { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "L", I: "N", A: "H" },
 };
 
 const BAND: Record<Severity, [number, number]> = {
@@ -120,7 +121,7 @@ export function buildMarkdownReport(name: string, result: ScanResult): string {
   L.push("");
   L.push("## Methodology");
   L.push(
-    "Automated attack simulation with taint-tracked dataflow: user-controlled sources (request params, bodies, forms, argv) are propagated through local assignments, and injection/XSS/command sinks report only on confirmed source→sink flows. Weakness classes cover injection, XSS, cryptography, authentication, access control, SSRF, deserialization, and misconfiguration (OWASP Top 10 2021 mapped). Dependency manifests and lockfiles are audited offline against a curated CVE database, plus supply-chain hygiene checks (unpinned versions, malicious install-script patterns, typosquatting). Each finding includes a CVSS-style vector, a simulated exploitation path, and remediation guidance.",
+    "Automated attack simulation with taint-tracked dataflow: user-controlled sources (request params, bodies, forms, argv) are propagated through local assignments, and injection/XSS/command sinks report only on confirmed source→sink flows. Weakness classes cover injection, XSS, cryptography, authentication, access control, SSRF, deserialization, and misconfiguration (OWASP Top 10 2021 mapped). A simulated fuzzing pass applies mutation strategies (boundary values, overflow, type confusion, unicode/format-string) to user-controlled flows and predicts crash patterns — ReDoS, unbounded allocation, unhandled parse errors, and out-of-bounds access. Dependency manifests and lockfiles are audited offline against a curated CVE database, plus supply-chain hygiene checks (unpinned versions, malicious install-script patterns, typosquatting). Each finding includes a CVSS-style vector, a simulated exploitation path, and remediation guidance.",
   );
   L.push("");
   L.push("## Scoring");
