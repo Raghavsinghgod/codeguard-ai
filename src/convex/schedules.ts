@@ -169,6 +169,20 @@ export const deleteSchedule = mutation({
   },
 });
 
+/** Sets (or clears) the GitHub webhook signing secret for a schedule. */
+export const setGithubSecret = mutation({
+  args: { id: v.id("scanSchedules"), secret: v.string() },
+  handler: async (ctx, { id, secret }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Not authenticated");
+    const s = await ctx.db.get(id);
+    if (!s || s.userId !== userId) throw new Error("Schedule not found");
+    const trimmed = secret.trim();
+    if (trimmed && trimmed.length < 8) throw new Error("Secret must be at least 8 characters");
+    await ctx.db.patch(id, { githubSecret: trimmed || undefined });
+  },
+});
+
 export const markAlertsSeen = mutation({
   args: {},
   handler: async (ctx) => {

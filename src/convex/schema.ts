@@ -175,6 +175,7 @@ const schema = defineSchema(
       lastRunAt: v.optional(v.number()),
       lastStatus: v.optional(v.string()),
       lastScanId: v.optional(v.id("scans")),
+      githubSecret: v.optional(v.string()), // GitHub webhook signing secret (plaintext; used to verify x-hub-signature-256)
       enabled: v.boolean(),
       createdAt: v.number(),
     })
@@ -202,6 +203,35 @@ const schema = defineSchema(
     })
       .index("by_user_time", ["userId", "at"])
       .index("by_schedule", ["scheduleId"]),
+
+    // Part 22: integrations. Outgoing webhook endpoints (Slack-style) receive
+    // scan and drift-alert notifications; delivery log records the last
+    // outcome per endpoint. Incoming GitHub webhooks re-scan repos on push.
+    webhookEndpoints: defineTable({
+      userId: v.id("users"),
+      name: v.string(), // display label, e.g. "#security-alerts"
+      url: v.string(), // https:// URL of the receiver
+      secretHash: v.optional(v.string()), // sha256 of the signing secret
+      events: v.array(
+        v.union(v.literal("scan"), v.literal("drift"), v.literal("critical")),
+      ),
+      enabled: v.boolean(),
+      lastStatus: v.optional(v.string()),
+      lastDeliveryAt: v.optional(v.number()),
+      createdAt: v.number(),
+    }).index("by_user", ["userId"]),
+
+    webhookDeliveries: defineTable({
+      userId: v.id("users"),
+      endpointId: v.id("webhookEndpoints"),
+      event: v.string(), // "scan.completed" | "drift.alert" | "critical.finding"
+      status: v.number(), // HTTP status (0 = network error)
+      ok: v.boolean(),
+      detail: v.string(),
+      at: v.number(),
+    })
+      .index("by_user_time", ["userId", "at"])
+      .index("by_endpoint_time", ["endpointId", "at"]),
 
     workspaceActivity: defineTable({
       workspaceId: v.id("workspaces"),
