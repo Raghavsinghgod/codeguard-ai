@@ -134,6 +134,33 @@ const schema = defineSchema(
       .index("by_workspace", ["workspaceId"])
       .index("by_scan", ["scanId"]),
 
+    // Part 20: report center. A profile holds client-facing branding applied
+    // to exported/scheduled reports; a schedule delivers a scan's report by
+    // email on a recurring cadence.
+    reportProfiles: defineTable({
+      userId: v.id("users"),
+      name: v.string(), // profile label, e.g. "Acme Corp brand"
+      company: v.string(), // client-facing company name on the report
+      accent: v.string(), // accent color (any CSS color string)
+      footer: v.string(), // footer line, e.g. confidentiality notice
+      createdAt: v.number(),
+    }).index("by_user", ["userId"]),
+
+    reportSchedules: defineTable({
+      userId: v.id("users"),
+      scanId: v.id("scans"),
+      profileId: v.optional(v.id("reportProfiles")),
+      recipients: v.array(v.string()),
+      frequency: v.union(v.literal("weekly"), v.literal("monthly")),
+      nextSendAt: v.number(),
+      lastSentAt: v.optional(v.number()),
+      lastStatus: v.optional(v.string()),
+      enabled: v.boolean(),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_due", ["enabled", "nextSendAt"]),
+
     workspaceActivity: defineTable({
       workspaceId: v.id("workspaces"),
       userId: v.id("users"),

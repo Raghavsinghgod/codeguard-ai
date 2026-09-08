@@ -200,8 +200,6 @@ export function runStrixAgents(result: ScanResult): StrixRun {
     push(recon.id, "recon", `discovered ${result.surface.endpoints.length} route(s); ${result.surface.authlessMutating?.length ?? 0} mutating without visible auth`);
   }
   if (result.surface?.ssrfSinks?.length) push(recon.id, "recon", `${result.surface.ssrfSinks.length} outbound-request sink(s) reachable from user input`);
-  const targets = findings.filter((f) => f.severity === "critical" || f.severity "high" ? false : true);
-  void targets;
   const priority = [...findings].sort(
     (a, b) =>
       ["critical", "high", "medium", "low", "info"].indexOf(a.severity) -

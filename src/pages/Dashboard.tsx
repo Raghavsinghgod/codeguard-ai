@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
 import {
   Crosshair,
+  FileOutput,
   FlaskConical,
   FolderOpen,
   GitCompareArrows,
@@ -35,6 +36,7 @@ import { DiffView } from "@/components/DiffView";
 import { AiAnalysis } from "@/components/AiAnalysis";
 import { RoadmapView } from "@/components/RoadmapView";
 import { TeamTab } from "@/components/TeamTab";
+import { ReportCenter } from "@/components/ReportCenter";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
@@ -335,7 +337,7 @@ export default function Dashboard() {
             </span>
             <span className="font-semibold tracking-tight">CrackScope</span>
             <Badge variant="outline" className="rounded-full font-mono text-[10px] text-muted-foreground">
-              {18}/25 shipped
+              {20}/25 shipped
             </Badge>
           </div>
           <div className="ml-auto flex items-center gap-3">
@@ -369,6 +371,9 @@ export default function Dashboard() {
               </TabsTrigger>
               <TabsTrigger value="roadmap" className="gap-2 rounded-full">
                 <ListChecks className="size-4" /> Roadmap
+              </TabsTrigger>
+              <TabsTrigger value="reports" className="gap-2 rounded-full">
+                <FileOutput className="size-4" /> Reports
               </TabsTrigger>
               <TabsTrigger value="team" className="gap-2 rounded-full">
                 <Users className="size-4" /> Team
@@ -760,6 +765,11 @@ export default function Dashboard() {
           {/* Roadmap */}
           <TabsContent value="roadmap">
             <RoadmapView />
+          </TabsContent>
+
+          {/* Report center (Part 20) */}
+          <TabsContent value="reports">
+            <ReportCenter />
           </TabsContent>
 
           {/* Team workspaces (Part 19) */}
