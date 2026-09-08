@@ -343,10 +343,10 @@ function TeamWorkspaceView({
                   </p>
                 </div>
                 <Badge variant="outline" className={`rounded-full ${SEVERITY_STYLE[s.critical > 0 ? "critical" : s.high > 0 ? "high" : s.medium > 0 ? "medium" : "low"].chip}`}>
-                  {s.critical > 0 ? `${s.critical} crit` : s.high > 0 ? `${s.high} high` : s.medium > 0 ? `${s.medium} med` : "clean"}
+                  {s.critical > 0 ? String(s.critical) + " crit" : s.high > 0 ? String(s.high) + " high" : s.medium > 0 ? String(s.medium) + " med" : "clean"}
                 </Badge>
               </div>
-            )}
+            ))}
           </CardContent>
         </Card>
 
