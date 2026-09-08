@@ -77,6 +77,11 @@ const RULE_CWE: Record<string, CweRef> = {
   "SSTI-002": { id: "CWE-1336", name: "Improper Neutralization of Special Elements Used in a Template Engine (compiled source)", owasp: "A03" },
   "ORM-001": { id: "CWE-89", name: "SQL Injection via ORM raw-query escape hatch", owasp: "A03" },
   "ORM-002": { id: "CWE-943", name: "Improper Neutralization in Data Query Logic (ORM operator injection)", owasp: "A03" },
+  // Network surface pass (Part 17)
+  "NET-001": { id: "CWE-306", name: "Missing Authentication for Critical Function", owasp: "A01" },
+  "NET-002": { id: "CWE-942", name: "Permissive Cross-domain Policy with Untrusted Origins", owasp: "A05" },
+  "NET-003": { id: "CWE-918", name: "Server-Side Request Forgery (internal surface)", owasp: "A10" },
+  "NET-004": { id: "CWE-601", name: "Open Redirect (absolute target)", owasp: "A01" },
 };
 
 /** CWE reference for a rule id; SECRET-* provider rules all map to CWE-798 / A02. */
@@ -164,6 +169,7 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
     checks: [
       { id: "CONFIG-001", label: "Permissive CORS policies", status: "tested" },
       { id: "CONFIG-002", label: "Debug mode / verbose errors exposed", status: "tested" },
+      { id: "NET-002", label: "CORS origin reflection with credentials", status: "tested" },
       { id: "IAC-", label: "IaC & pipeline configuration scanning (Part 18)", status: "planned" },
     ],
   },
@@ -211,6 +217,7 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
     description: "Server fetches an attacker-controlled destination.",
     checks: [
       { id: "SSRF-001", label: "User-controlled outbound request URLs", status: "tested" },
+      { id: "NET-003", label: "Internal/loopback request surface mapping", status: "tested" },
     ],
   },
 ];

@@ -11,6 +11,7 @@ import { runFuzzing } from "./fuzz";
 import { detectAuthAttacks } from "./authattacks";
 import { detectCryptoMisuse } from "./cryptomisuse";
 import { runInjectionDeepScan, detectEngine } from "./injection";
+import { runNetworkScan, type NetworkSurface } from "./network";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -42,6 +43,9 @@ export interface ScanResult {
   counts: Record<Severity, number>;
   findings: Finding[];
   durationMs: number;
+  /** Part 17: network attack-surface map (endpoints, CORS, SSRF, redirects).
+   *  Optional: reconstructed-from-history scans may not carry it. */
+  surface?: NetworkSurface;
 }
 
 export const SEVERITY_WEIGHT: Record<Severity, number> = {
@@ -398,6 +402,9 @@ export function scan(inputs: ScanInput[]): ScanResult {
     if (engine) break;
   }
 
+  // Part 17: per-file surface maps merged into one at the end.
+  const surfaces: Partial<NetworkSurface>[] = [];
+
   for (const input of inputs) {
     const language = extToLanguage(input.name);
     if (language !== "Unknown") languages.add(language);
@@ -457,6 +464,12 @@ export function scan(inputs: ScanInput[]): ScanResult {
     // Part 16: injection deep-scan pass — LDAP, SSTI, ORM raw-query and
     // operator-injection variants, with engine-aware payload selection.
     findings.push(...runInjectionDeepScan(input, reportedLines, engine));
+
+    // Part 17: network surface pass — endpoint discovery, CORS posture,
+    // SSRF sink mapping, redirect graph (findings + surface summary).
+    const net = runNetworkScan(input, reportedLines);
+    findings.push(...net.findings);
+    surfaces.push(net.surface);
   }
 
   findings.sort((a, b) => {
@@ -474,6 +487,17 @@ export function scan(inputs: ScanInput[]): ScanResult {
   const score = Math.max(0, Math.min(100, Math.round(100 - penalty)));
   const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F";
 
+  // Merge per-file surface maps into one (Part 17).
+  const surface: NetworkSurface = {
+    endpoints: surfaces.flatMap((s) => s.endpoints ?? []),
+    corsWildcard: surfaces.some((s) => s.corsWildcard),
+    corsReflectsOrigin: surfaces.some((s) => s.corsReflectsOrigin),
+    ssrfSinks: surfaces.flatMap((s) => s.ssrfSinks ?? []),
+    redirects: surfaces.flatMap((s) => s.redirects ?? []),
+    unvalidatedRedirects: surfaces.reduce((n, s) => n + (s.unvalidatedRedirects ?? 0), 0),
+    authlessMutating: surfaces.flatMap((s) => s.authlessMutating ?? []),
+  };
+
   return {
     score,
     grade,
@@ -483,6 +507,7 @@ export function scan(inputs: ScanInput[]): ScanResult {
     counts,
     findings,
     durationMs: Math.round(performance.now() - started),
+    surface,
   };
 }
 

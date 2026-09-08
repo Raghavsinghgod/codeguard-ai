@@ -712,6 +712,51 @@ const GUIDES: Record<string, HardeningGuide> = {
     after: "const { email } = userSchema.parse(req.body);\ndb.user.findMany({ where: { email } });",
     verify: "Re-scan; a body of {\"$ne\":null} must not alter the filter.",
   },
+  // Network surface pass (Part 17)
+  "NET-001": {
+    difficulty: "easy",
+    effort: "~15 min per route",
+    steps: [
+      "Attach auth middleware to the route (or router-level requireAuth for the group).",
+      "Verify the principal may mutate the targeted resource (ownership check).",
+    ],
+    before: 'router.delete("/items/:id", handler);',
+    after: 'router.delete("/items/:id", requireAuth, requireOwnership, handler);',
+    verify: "Re-scan; unauthenticated DELETE/POST to the route must return 401.",
+  },
+  "NET-002": {
+    difficulty: "easy",
+    effort: "~20 min",
+    steps: [
+      "Replace origin reflection with a static allowlist.",
+      "Set credentials only for allowlisted origins.",
+    ],
+    before: "cors({ origin: true, credentials: true });",
+    after: "cors({ origin: ['https://app.tld'], credentials: true });",
+    verify: "Re-scan; a request with Origin: https://evil.tld must get no ACAO header.",
+  },
+  "NET-003": {
+    difficulty: "moderate",
+    effort: "~1–2 h",
+    steps: [
+      "Block private/link-local ranges on any user-influenced outbound fetch.",
+      "Prefer service-to-service auth over raw internal HTTP calls.",
+    ],
+    before: "await fetch(`http://localhost:8080/${path}`);",
+    after: "// use an internal service client with mTLS/auth; never build URLs from input",
+    verify: "Re-scan; SSRF probes to 127.0.0.1/169.254.169.254 must be blocked.",
+  },
+  "NET-004": {
+    difficulty: "easy",
+    effort: "~20 min",
+    steps: [
+      "Redirect to relative paths only; allowlist absolute hosts.",
+      "Reject protocol-relative (//) and scheme-mismatched targets.",
+    ],
+    before: "res.redirect(req.query.next);",
+    after: "const t = String(req.query.next ?? '/');\nres.redirect(t.startsWith('/') && !t.startsWith('//') ? t : '/');",
+    verify: "Re-scan; next=//evil.tld must fall back to the default path.",
+  },
 };
 
 // Category fallback for anything without a dedicated guide.
