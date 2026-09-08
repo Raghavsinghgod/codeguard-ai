@@ -233,6 +233,19 @@ const schema = defineSchema(
       .index("by_user_time", ["userId", "at"])
       .index("by_endpoint_time", ["endpointId", "at"]),
 
+    // Part 25: public API. API keys authenticate programmatic access to the
+    // CrackScope HTTP API (POST /api/v1/scan, GET /api/v1/scans, and CI
+    // webhook receivers). Only a SHA-256 hash of each key is stored.
+    apiKeys: defineTable({
+      userId: v.id("users"),
+      name: v.string(), // label, e.g. "ci-pipeline"
+      keyHash: v.string(), // sha256 hex of `cs_<secret>`
+      prefix: v.string(), // first chars shown in UI, e.g. "cs_a1b2…"
+      lastUsedAt: v.optional(v.number()),
+      revoked: v.boolean(),
+      createdAt: v.number(),
+    }).index("by_hash", ["keyHash"]).index("by_user", ["userId"]),
+
     workspaceActivity: defineTable({
       workspaceId: v.id("workspaces"),
       userId: v.id("users"),

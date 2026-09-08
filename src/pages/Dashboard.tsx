@@ -21,6 +21,7 @@ import {
   Minus,
   Play,
   Radar,
+  Terminal,
   Trash2,
   TrendingDown,
   TrendingUp,
@@ -44,6 +45,7 @@ import { ScheduledScans } from "@/components/ScheduledScans";
 import { IntegrationsTab } from "@/components/IntegrationsTab";
 import KnowledgeBase from "@/components/KnowledgeBase";
 import Analytics from "@/components/Analytics";
+import ApiTab from "@/components/ApiTab";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
@@ -344,7 +346,7 @@ export default function Dashboard() {
             </span>
             <span className="font-semibold tracking-tight">CrackScope</span>
             <Badge variant="outline" className="rounded-full font-mono text-[10px] text-muted-foreground">
-              {24}/25 shipped
+              {25}/25 shipped
             </Badge>
           </div>
           <div className="ml-auto flex items-center gap-3">
@@ -393,6 +395,9 @@ export default function Dashboard() {
               </TabsTrigger>
               <TabsTrigger value="knowledge" className="gap-2 rounded-full">
                 <BookOpen className="size-4" /> Knowledge
+              </TabsTrigger>
+              <TabsTrigger value="api" className="gap-2 rounded-full">
+                <Terminal className="size-4" /> API
               </TabsTrigger>
               <TabsTrigger value="team" className="gap-2 rounded-full">
                 <Users className="size-4" /> Team
@@ -809,6 +814,11 @@ export default function Dashboard() {
           {/* Attack knowledge base (Part 23) */}
           <TabsContent value="knowledge">
             <KnowledgeBase />
+          </TabsContent>
+
+          {/* Public API & CLI (Part 25) */}
+          <TabsContent value="api">
+            <ApiTab />
           </TabsContent>
 
           {/* Team workspaces (Part 19) */}
