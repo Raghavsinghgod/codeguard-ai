@@ -61,8 +61,8 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
     phase: 4,
     name: "Product depth",
     parts: [
-      p(16, "Injection deep-scan", "SQL/NoSQL/LDAP/template/ORM variants with database-engine-aware payload selection.", "up-next"),
-      p(17, "Network surface mapper", "Endpoint discovery, CORS analysis, SSRF surface, and open-redirect graphing.", "planned"),
+      p(16, "Injection deep-scan", "SQL/NoSQL/LDAP/template/ORM variants with database-engine-aware payload selection.", "shipped"),
+      p(17, "Network surface mapper", "Endpoint discovery, CORS analysis, SSRF surface, and open-redirect graphing.", "up-next"),
       p(18, "CI/CD & pipeline guardrails", "GitHub Actions, Dockerfile, and Terraform/IaC scanning with pipeline-blocking severity gates.", "planned"),
       p(19, "Team workspaces", "Multi-member projects, roles, shared reports, and activity feeds.", "planned"),
       p(20, "Report center", "Branded pentest reports, client-ready exports, and scheduled email delivery.", "planned"),

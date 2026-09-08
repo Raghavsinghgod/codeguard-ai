@@ -70,6 +70,13 @@ const RULE_CWE: Record<string, CweRef> = {
   "CCERT-001": { id: "CWE-295", name: "Improper Certificate Validation", owasp: "A02" },
   "CRAND-001": { id: "CWE-330", name: "Use of Insufficiently Random Values", owasp: "A02" },
   "CDES-001": { id: "CWE-327", name: "Use of a Broken or Risky Cryptographic Algorithm (legacy cipher)", owasp: "A02" },
+  // Injection deep-scan pass (Part 16)
+  "LDAP-001": { id: "CWE-90", name: "Improper Neutralization of Special Elements used in an LDAP Query ('LDAP Injection')", owasp: "A03" },
+  "LDAP-002": { id: "CWE-90", name: "Improper Neutralization of Special Elements used in an LDAP Query (DN injection)", owasp: "A03" },
+  "SSTI-001": { id: "CWE-1336", name: "Improper Neutralization of Special Elements Used in a Template Engine", owasp: "A03" },
+  "SSTI-002": { id: "CWE-1336", name: "Improper Neutralization of Special Elements Used in a Template Engine (compiled source)", owasp: "A03" },
+  "ORM-001": { id: "CWE-89", name: "SQL Injection via ORM raw-query escape hatch", owasp: "A03" },
+  "ORM-002": { id: "CWE-943", name: "Improper Neutralization in Data Query Logic (ORM operator injection)", owasp: "A03" },
 };
 
 /** CWE reference for a rule id; SECRET-* provider rules all map to CWE-798 / A02. */
@@ -136,6 +143,9 @@ export const OWASP_CATEGORIES: OwaspCategory[] = [
       { id: "CMD-", label: "OS command injection & dynamic evaluation", status: "tested" },
       { id: "XSS-", label: "Cross-site scripting sinks & reflection", status: "tested" },
       { id: "PROTO-001", label: "Prototype pollution via deep merge", status: "tested" },
+      { id: "LDAP-", label: "LDAP filter & DN injection", status: "tested" },
+      { id: "SSTI-", label: "Server-side template injection (SSTI)", status: "tested" },
+      { id: "ORM-", label: "ORM raw-query & operator injection variants", status: "tested" },
     ],
   },
   {

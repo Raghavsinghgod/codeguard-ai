@@ -643,6 +643,75 @@ const GUIDES: Record<string, HardeningGuide> = {
     after: 'crypto.createCipheriv("aes-256-gcm", key, iv); // + authTag handling',
     verify: "Re-scan; no DES/3DES/RC4/Blowfish references remain.",
   },
+  // Injection deep-scan pass (Part 16)
+  "LDAP-001": {
+    difficulty: "easy",
+    effort: "~30 min",
+    steps: [
+      "Escape filter metacharacters per RFC 4515 with a dedicated encoder.",
+      "Prefer library APIs that parameterize filter values.",
+      "Validate input shape before it reaches any filter.",
+    ],
+    before: 'const filter = `(&(uid=${req.body.user})(pw=${req.body.pw}))`;',
+    after: "const filter = `(&(uid=${ldapEscape.filter(req.body.user)})(pw=${ldapEscape.filter(req.body.pw)}))`;",
+    verify: "Re-scan; a username of '*)' must no longer alter the filter.",
+  },
+  "LDAP-002": {
+    difficulty: "easy",
+    effort: "~30 min",
+    steps: [
+      "Escape DN metacharacters per RFC 4514.",
+      "Build DNs from validated, allowlisted components only.",
+    ],
+    before: 'const dn = `uid=${req.body.user},ou=people,dc=corp,dc=com`;',
+    after: "const dn = `uid=${ldapEscape.dn(req.body.user)},ou=people,dc=corp,dc=com`;",
+    verify: "Re-scan; a username containing ',' must not re-root the DN.",
+  },
+  "SSTI-001": {
+    difficulty: "moderate",
+    effort: "~1–2 h",
+    steps: [
+      "Render user input as template data (context), never as template source.",
+      "Replace render_template_string with static templates + context vars.",
+      "If dynamic templates are unavoidable, sandbox and allowlist functions.",
+    ],
+    before: "render_template_string(req.args.get('tpl'))",
+    after: "render_template('greeting.html', name=req.args.get('name'))",
+    verify: "Re-scan; {{7*7}} in any input must render literally, not evaluate.",
+  },
+  "SSTI-002": {
+    difficulty: "moderate",
+    effort: "~1–2 h",
+    steps: [
+      "Keep templates as static files in the repository.",
+      "Pass user input strictly as render context variables.",
+    ],
+    before: 'ejs.render(`<h1>${req.query.tpl}</h1>`, {});',
+    after: 'ejs.renderFile("views/hello.ejs", { name: req.query.name });',
+    verify: "Re-scan; no compile/render call receives a string containing request data.",
+  },
+  "ORM-001": {
+    difficulty: "easy",
+    effort: "~30 min per query",
+    steps: [
+      "Use the ORM's parameterized raw form (Prisma $queryRaw`…` tagged template, knex.raw with ? bindings).",
+      "Replace *Unsafe variants ($queryRawUnsafe, $executeRawUnsafe) with the safe forms.",
+    ],
+    before: 'prisma.$queryRawUnsafe(`SELECT * FROM users WHERE id = ${req.params.id}`);',
+    after: "prisma.$queryRaw`SELECT * FROM users WHERE id = ${id}`; // tagged template = parameterized",
+    verify: "Re-scan; an id of '1; DROP TABLE users' must be treated as a literal string.",
+  },
+  "ORM-002": {
+    difficulty: "easy",
+    effort: "~30 min",
+    steps: [
+      "Pick typed fields explicitly instead of spreading the request body.",
+      "Validate with a schema and strip operator-like keys ($gt, Op.or, __gt).",
+    ],
+    before: "db.user.findMany({ where: req.body });",
+    after: "const { email } = userSchema.parse(req.body);\ndb.user.findMany({ where: { email } });",
+    verify: "Re-scan; a body of {\"$ne\":null} must not alter the filter.",
+  },
 };
 
 // Category fallback for anything without a dedicated guide.

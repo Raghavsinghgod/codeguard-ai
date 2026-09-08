@@ -10,6 +10,7 @@ import { auditDependencies } from "./deps";
 import { runFuzzing } from "./fuzz";
 import { detectAuthAttacks } from "./authattacks";
 import { detectCryptoMisuse } from "./cryptomisuse";
+import { runInjectionDeepScan, detectEngine } from "./injection";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -389,6 +390,14 @@ export function scan(inputs: ScanInput[]): ScanResult {
   const languages = new Set<string>();
   let linesScanned = 0;
 
+  // Part 16: detect the database engine once from manifests so engine-aware
+  // payloads can be attached to injection findings.
+  let engine: string | null = null;
+  for (const input of inputs) {
+    engine = detectEngine(input);
+    if (engine) break;
+  }
+
   for (const input of inputs) {
     const language = extToLanguage(input.name);
     if (language !== "Unknown") languages.add(language);
@@ -444,6 +453,10 @@ export function scan(inputs: ScanInput[]): ScanResult {
     // Part 15: crypto misuse pass — hardcoded IVs, ECB, nonce reuse, weak
     // keys, unauthenticated encryption, legacy ciphers (structure rules).
     findings.push(...detectCryptoMisuse(input, reportedLines));
+
+    // Part 16: injection deep-scan pass — LDAP, SSTI, ORM raw-query and
+    // operator-injection variants, with engine-aware payload selection.
+    findings.push(...runInjectionDeepScan(input, reportedLines, engine));
   }
 
   findings.sort((a, b) => {
