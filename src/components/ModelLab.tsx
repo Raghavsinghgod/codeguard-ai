@@ -22,6 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import FoundationLab from "@/components/FoundationLab";
 import {
   ALL_MODEL_PARTS,
   APP_INTEGRATION,
@@ -429,6 +430,7 @@ export default function ModelLab() {
         <TabsTrigger value="experts">12 experts</TabsTrigger>
         <TabsTrigger value="training">Training & safety</TabsTrigger>
         <TabsTrigger value="roadmap">50-part plan</TabsTrigger>
+        <TabsTrigger value="foundation">Foundation lab</TabsTrigger>
         <TabsTrigger value="integration">App integration</TabsTrigger>
       </TabsList>
       <TabsContent value="architecture">
@@ -442,6 +444,9 @@ export default function ModelLab() {
       </TabsContent>
       <TabsContent value="roadmap">
         <RoadmapTab />
+      </TabsContent>
+      <TabsContent value="foundation">
+        <FoundationLab />
       </TabsContent>
       <TabsContent value="integration">
         <IntegrationTab />
