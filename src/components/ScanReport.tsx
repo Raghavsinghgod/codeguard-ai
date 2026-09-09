@@ -327,10 +327,6 @@ export function ScanReport({ data }: { data: ScanReportData }) {
   }, [triageRows]);
   const [hideFp, setHideFp] = useState(false);
   const [strixMode, setStrixMode] = useState<ScanMode>("standard");
-  const strixRun: StrixRun | null = useMemo(
-    () => (result.findings.length > 0 ? runStrixAgents(actionableResult, { mode: strixMode }) : null),
-    [result, strixMode, triageMap],
-  );
 
   const onTriage = (key: string, patch: Partial<TriageState>) => {
     if (!scanId) return;
@@ -353,6 +349,10 @@ export function ScanReport({ data }: { data: ScanReportData }) {
     () => ({ ...result, findings: result.findings.filter((f) => !isFp(f)) }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [result, triageMap],
+  );
+  const strixRun: StrixRun | null = useMemo(
+    () => (result.findings.length > 0 ? runStrixAgents(actionableResult, { mode: strixMode }) : null),
+    [result, strixMode, triageMap],
   );
   const severities: Severity[] = ["critical", "high", "medium", "low", "info"];
   const rating = riskRating(result);
