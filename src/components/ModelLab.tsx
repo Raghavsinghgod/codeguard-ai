@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import FoundationLab from "@/components/FoundationLab";
 import PretrainingLab from "@/components/PretrainingLab";
+import MidtrainingLab from "@/components/MidtrainingLab";
 import {
   ALL_MODEL_PARTS,
   APP_INTEGRATION,
@@ -433,6 +434,7 @@ export default function ModelLab() {
         <TabsTrigger value="roadmap">50-part plan</TabsTrigger>
         <TabsTrigger value="foundation">Foundation lab</TabsTrigger>
         <TabsTrigger value="pretraining">Pretraining lab</TabsTrigger>
+        <TabsTrigger value="midtraining">Mid-training lab</TabsTrigger>
         <TabsTrigger value="integration">App integration</TabsTrigger>
       </TabsList>
       <TabsContent value="architecture">
@@ -452,6 +454,9 @@ export default function ModelLab() {
       </TabsContent>
       <TabsContent value="pretraining">
         <PretrainingLab />
+      </TabsContent>
+      <TabsContent value="midtraining">
+        <MidtrainingLab />
       </TabsContent>
       <TabsContent value="integration">
         <IntegrationTab />
